@@ -1,6 +1,10 @@
 # Azure Connection Assistant
 This project contains both a PowerShell Module and a Library for assisting with connecting to and validating a connection to an Azure RM Subscription.
 
+To use the module, copy the AzureConnectionAssistant folder from within the Module folder of the project to the following directory - '%Windir%\System32\WindowsPowerShell\v1.0\Modules'
+
+To use the library, save the AzureConnectionHelperLibrary.ps1 file to a local scripting directory and dot source the file into your session.
+
 Created by: Scott Thomas - scott@deathbyvegemite.com
 Copyright (c) 2017. All rights reserved.	
 

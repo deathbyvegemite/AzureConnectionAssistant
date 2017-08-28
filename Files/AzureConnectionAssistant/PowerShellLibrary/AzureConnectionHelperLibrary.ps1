@@ -169,7 +169,7 @@ OF THE USE OR THE RESULTS FROM THE USE OF THIS CODE REMAINS WITH THE USER.
 		}
 		else
 		{ 
-			$CredToConnectTo = (List-SavedCreds)[($promptvalue - 1)]
+			$CredToConnectTo = (Show-SavedCreds)[($promptvalue - 1)]
 			$creds = Get-SavedCreds $($CredToConnectTo.name)
 		}
 	}	
