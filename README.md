@@ -1,13 +1,10 @@
-TOPIC
-
+# TOPIC
 about_AzureConnectionAssistant
 
-SHORT DESCRIPTION
-
+# SHORT DESCRIPTION
 A module to assist with connecting to and validating a connection to an Azure RM Subscription.
 
-LONG DESCRIPTION
-
+# LONG DESCRIPTION
 The following functions allows for the saving and retrieving of encrypted credentials from the HKLM context of the logged in user.
 
 	Test-Session:		Initiates a check to see if you are have a current Azure Login session, if it finds you don't, it prompts you to select credentials saved in the Registry.
