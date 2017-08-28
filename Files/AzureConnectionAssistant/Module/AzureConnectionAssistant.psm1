@@ -1,31 +1,3 @@
-<#
-	.SYNOPSIS
-	Library to assist with connecting to and validating a connection to an Azure RM Subscription.
-	v0.9
-
-	.DESCRIPTION
-	The following functions allows for the saving and retrieving of encrypted credentials from the HKCU context of the logged in user.
-
-	Test-Session:		Initiates a check to see if you are have a current Azure Login session, if it finds you don't, it prompts you to select credentials saved in the Registry.
-
-	New-AzureRMLogin:	Used by Test-Session to connect to Azure using credentials saved in the Registry of the user.
-
-	Get-SavedCreds:		Retrieves a credential that is stored in the registry.
-
-	Show-SavedCreds:	Displays credentials that are stored in the registry.
-
-	New-SavedCreds:		Used to add a new credential set to the registry.
-
-	Set-SavedCreds:		Used to update an exisiting stored credentual.
-
-	.NOTES
-	Created by: Scott Thomas - scott@deathbyvegemite.com
-	Copyright (c) 2017. All rights reserved.	
-
-	THIS CODE IS MADE AVAILABLE AS IS, WITHOUT WARRANTY OF ANY KIND. THE ENTIRE RISK
-	OF THE USE OR THE RESULTS FROM THE USE OF THIS CODE REMAINS WITH THE USER.
-#>
-
 function Test-Session ()
 {
 <#
