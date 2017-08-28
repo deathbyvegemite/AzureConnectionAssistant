@@ -3,6 +3,7 @@ TOPIC
 
 SHORT DESCRIPTION
     A module to assist with connecting to and validating a connection to an Azure RM Subscription.
+	v0.9
 
 LONG DESCRIPTION
 	The following functions allows for the saving and retrieving of encrypted credentials from the HKCU hive of the , and to validate

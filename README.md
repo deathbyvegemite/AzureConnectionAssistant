@@ -10,6 +10,7 @@ OF THE USE OR THE RESULTS FROM THE USE OF THIS CODE REMAINS WITH THE USER.
 
 ### DESCRIPTION
 The following functions allows for the saving and retrieving of encrypted credentials from the HKLM context of the logged in user.
+
 	Test-Session:		Initiates a check to see if you are have a current Azure Login session, if it finds you don't, it prompts you to select credentials saved in the Registry.
 
 	New-AzureRMLogin:	Used by Test-Session to connect to Azure using credentials saved in the Registry of the user.
@@ -89,6 +90,3 @@ The following functions allows for the saving and retrieving of encrypted creden
 	PS C:\> Set-SavedCreds -CredName MyAzureCreds -Creds $creds
 	True
 	PS C:\>
-
-#### KEYWORDS
-Login-AzureRmAccount, AzureRM, SavedCreds.
