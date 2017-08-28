@@ -41,7 +41,7 @@ OF THE USE OR THE RESULTS FROM THE USE OF THIS CODE REMAINS WITH THE USER.
 	$sesh = Get-AzureRmContext -ErrorAction SilentlyContinue
 	if ($Sesh.Environment -like $null)
 	{
-		Write-Host -f Yellow "No session found or No local credentials stored."
+		Write-Host -f Yellow "No session found or no local credentials stored."
 		New-AzureRMLogin
 	}
 }
