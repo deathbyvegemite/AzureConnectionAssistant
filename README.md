@@ -1,10 +1,10 @@
-# TOPIC
+## TOPIC
 about_AzureConnectionAssistant
 
-# SHORT DESCRIPTION
+## SHORT DESCRIPTION
 A module to assist with connecting to and validating a connection to an Azure RM Subscription.
 
-# LONG DESCRIPTION
+## LONG DESCRIPTION
 The following functions allows for the saving and retrieving of encrypted credentials from the HKLM context of the logged in user.
 
 	Test-Session:		Initiates a check to see if you are have a current Azure Login session, if it finds you don't, it prompts you to select credentials saved in the Registry.
@@ -25,8 +25,8 @@ The following functions allows for the saving and retrieving of encrypted creden
 	THIS CODE IS MADE AVAILABLE AS IS, WITHOUT WARRANTY OF ANY KIND. THE ENTIRE RISK
 	OF THE USE OR THE RESULTS FROM THE USE OF THIS CODE REMAINS WITH THE USER.
 
-EXAMPLES
-# Test-Session
+# EXAMPLES
+## Test-Session
 	PS C:\> Test-Session
 	No session found or No local credentials stored.
 	Please select from the following
@@ -44,7 +44,7 @@ EXAMPLES
 	PS C:\>
 
 
-# Get-SavedCreds
+## Get-SavedCreds
 	PS C:\> $creds = Get-SavedCreds MyAzureCreds
 	PS C:\> $creds
 	UserName                                Password
@@ -54,7 +54,7 @@ EXAMPLES
 	PS C:\>
 
 
-# Show-SavedCreds
+## Show-SavedCreds
 	PS C:\> Show-SavedCreds -ShowPasswords
 
 	Name			UserName					Password
@@ -64,7 +64,7 @@ EXAMPLES
 	PS C:\>
 
 
-# New-SavedCreds
+## New-SavedCreds
 	PS C:\> $creds = Get-Credential scott@examplenotreal.com
 	PS C:\> New-SavedCreds -CredName MyAzureCreds -Creds $creds
 		Hive: HKEY_CURRENT_USER\System\CurrentControlSet\SecCreds
@@ -90,7 +90,7 @@ EXAMPLES
 	PS C:\>
 
 
-# Set-SavedCreds
+## Set-SavedCreds
 	PS C:\> $creds = Get-Credential scott@examplenotreal.com
 	PS C:\> Set-SavedCreds -CredName MyAzureCreds -Creds $creds
 	True
