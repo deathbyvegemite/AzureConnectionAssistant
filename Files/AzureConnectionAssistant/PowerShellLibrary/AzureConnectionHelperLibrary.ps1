@@ -153,13 +153,13 @@ OF THE USE OR THE RESULTS FROM THE USE OF THIS CODE REMAINS WITH THE USER.
 	if ((Test-Path -Path HKCU:\System\CurrentControlSet\SecCreds) -eq $false){return $false}
 	if ($ConnectWithDefault)
 	{
-		$Default = (List-SavedCreds)[0].Name
+		$Default = (Show-SavedCreds)[0].Name
 		$creds = Get-SavedCreds $Default
 	}
 	else
 	{
 		Write-Host "Please select from the following"
-		$i = 1; Foreach ($Name in (List-SavedCreds | select Name)) { Write-Host "$i`: $($name.name)"; $i++ }
+		$i = 1; Foreach ($Name in (Show-SavedCreds | select Name)) { Write-Host "$i`: $($name.name)"; $i++ }
 		Write-Host "$i`: To enter credentials manually (Needed for any Federated credentials)"
 		$promptvalue = Read-Host -Prompt "Select: "
 		if ($promptvalue -eq $i)
