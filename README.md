@@ -1,12 +1,15 @@
-## TOPIC
-about_AzureConnectionAssistant
+# Azure Connection Assistant
+This project contains both a PowerShell Module and a Library for assisting with connecting to and validating a connection to an Azure RM Subscription.
 
-## SHORT DESCRIPTION
-A module to assist with connecting to and validating a connection to an Azure RM Subscription.
+Created by: Scott Thomas - scott@deathbyvegemite.com
+Copyright (c) 2017. All rights reserved.	
 
-## LONG DESCRIPTION
+THIS CODE IS MADE AVAILABLE AS IS, WITHOUT WARRANTY OF ANY KIND. THE ENTIRE RISK
+OF THE USE OR THE RESULTS FROM THE USE OF THIS CODE REMAINS WITH THE USER.
+
+
+### DESCRIPTION
 The following functions allows for the saving and retrieving of encrypted credentials from the HKLM context of the logged in user.
-
 	Test-Session:		Initiates a check to see if you are have a current Azure Login session, if it finds you don't, it prompts you to select credentials saved in the Registry.
 
 	New-AzureRMLogin:	Used by Test-Session to connect to Azure using credentials saved in the Registry of the user.
@@ -19,14 +22,9 @@ The following functions allows for the saving and retrieving of encrypted creden
 
 	Set-SavedCreds:		Used to update an exisiting stored credentual.
 
-	Created by: Scott Thomas - scott@deathbyvegemite.com
-	Copyright (c) 2017. All rights reserved.	
 
-	THIS CODE IS MADE AVAILABLE AS IS, WITHOUT WARRANTY OF ANY KIND. THE ENTIRE RISK
-	OF THE USE OR THE RESULTS FROM THE USE OF THIS CODE REMAINS WITH THE USER.
-
-# EXAMPLES
-## Test-Session
+### EXAMPLES
+#### Test-Session
 	PS C:\> Test-Session
 	No session found or No local credentials stored.
 	Please select from the following
@@ -42,9 +40,8 @@ The following functions allows for the saving and retrieving of encrypted creden
 	CurrentStorageAccount :
 
 	PS C:\>
-
-
-## Get-SavedCreds
+	
+#### Get-SavedCreds
 	PS C:\> $creds = Get-SavedCreds MyAzureCreds
 	PS C:\> $creds
 	UserName                                Password
@@ -52,9 +49,8 @@ The following functions allows for the saving and retrieving of encrypted creden
 	scott@examplenotreal.com System.Security.SecureString
 
 	PS C:\>
-
-
-## Show-SavedCreds
+	
+#### Show-SavedCreds
 	PS C:\> Show-SavedCreds -ShowPasswords
 
 	Name			UserName					Password
@@ -62,9 +58,8 @@ The following functions allows for the saving and retrieving of encrypted creden
 	MyAzureCreds	scott@examplenotreal.com	P@s$W0rd!
 
 	PS C:\>
-
-
-## New-SavedCreds
+	
+#### New-SavedCreds
 	PS C:\> $creds = Get-Credential scott@examplenotreal.com
 	PS C:\> New-SavedCreds -CredName MyAzureCreds -Creds $creds
 		Hive: HKEY_CURRENT_USER\System\CurrentControlSet\SecCreds
@@ -89,13 +84,11 @@ The following functions allows for the saving and retrieving of encrypted creden
 
 	PS C:\>
 
-
-## Set-SavedCreds
+#### Set-SavedCreds
 	PS C:\> $creds = Get-Credential scott@examplenotreal.com
 	PS C:\> Set-SavedCreds -CredName MyAzureCreds -Creds $creds
 	True
 	PS C:\>
 
-### KEYWORDS
-
+#### KEYWORDS
 Login-AzureRmAccount, AzureRM, SavedCreds.
