@@ -13,7 +13,7 @@ OF THE USE OR THE RESULTS FROM THE USE OF THIS CODE REMAINS WITH THE USER.
 
 
 ### DESCRIPTION
-The following functions allows for the saving and retrieving of encrypted credentials from the HKLM context of the logged in user.
+The following functions allows for the saving and retrieving of encrypted credentials from the HKLM context of the logged in user and for connecting or validating a connection to an Azure RM Subscription.
 
 	Test-Session:		Initiates a check to see if you are have a current Azure Login session, if it finds you don't, it prompts you to select credentials saved in the Registry.
 
