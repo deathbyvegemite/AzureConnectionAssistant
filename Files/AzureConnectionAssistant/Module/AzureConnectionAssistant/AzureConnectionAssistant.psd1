@@ -12,7 +12,7 @@
 RootModule = 'AzureConnectionAssistant.psm1'
 
 # Version number of this module.
-ModuleVersion = '1.0.3.3'
+ModuleVersion = '1.0.3.4'
 
 # ID used to uniquely identify this module
 GUID = '84740243-b6d9-4c70-87f9-5826d288d907'

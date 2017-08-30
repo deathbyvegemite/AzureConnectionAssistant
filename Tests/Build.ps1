@@ -65,6 +65,7 @@ else
         git add --all
         git status
         git commit -s -m "Update version to $newVersion"
+        git push origin master
         Write-Host "AzureConnectionAssistant PowerShell Module version $newVersion published to GitHub." -ForegroundColor Cyan
     }
     Catch 
