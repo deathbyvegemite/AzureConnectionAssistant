@@ -30,4 +30,8 @@ install:
 
 # If any of the tests fail, consider the pipeline failed
  test_script:
-   - ps: . .\Tests\build.ps1
+  - git config --global credential.helper store
+  - ps: Add-Content "$env:USERPROFILE\.git-credentials" "https://$($env:GitHubKey):x-oauth-basic@github.com`n"
+  - git config --global user.email "scott@examplenotreal.com"
+  - git config --global user.name "deathbyvegemite"
+  - ps: . .\Tests\build.ps1
