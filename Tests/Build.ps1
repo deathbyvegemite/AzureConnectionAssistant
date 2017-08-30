@@ -30,6 +30,7 @@ else
         # Update the manifest with the new version value and fix the weird string replace bug
         Update-ModuleManifest -Path $manifestPath -ModuleVersion $newVersion
         (Get-Content -Path $manifestPath) -replace 'PSGet_AzureConnectionAssistant', 'AzureConnectionAssistant' | Set-Content -Path $manifestPath
+		(Get-Content -Path $manifestPath) -replace 'NewManifest', 'AzureConnectionAssistant' | Set-Content -Path $manifestPath
     }
     catch
     {
@@ -61,11 +62,9 @@ else
         # Set up a path to the git.exe cmd, import posh-git to give us control over git, and then push changes to GitHub
         # Note that "update version" is included in the appveyor.yml file's "skip a build" regex to avoid a loop
         $env:Path += ";$env:ProgramFiles\Git\cmd"
-        git checkout master
         git add --all
         git status
         git commit -s -m "Update version to $newVersion"
-        git push origin master
         Write-Host "AzureConnectionAssistant PowerShell Module version $newVersion published to GitHub." -ForegroundColor Cyan
     }
     Catch 
