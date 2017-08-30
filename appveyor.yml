@@ -2,7 +2,7 @@
 build: off
 
 # Version number
-version: 1.0.{build}
+version: 1.0.2.{build}
 
 # Ignore testing a commit if only the README.md file changed
 # Or if various strings are found in the commit message: updated readme, update readme, update docs, update version, update appveyor
@@ -25,13 +25,9 @@ environment:
 
 # Install NuGet to interact with the PowerShell Gallery
 install:
-- ps: |
-    Install-PackageProvider -Name NuGet -Force | Out-Null
-
-# If any of the tests fail, consider the pipeline failed
- test_script:
-  - git config --global credential.helper store
-  - ps: Add-Content "$env:USERPROFILE\.git-credentials" "https://$($env:GitHubKey):x-oauth-basic@github.com`n"
-  - git config --global user.email "scott@examplenotreal.com"
-  - git config --global user.name "deathbyvegemite"
-  - ps: . .\Tests\build.ps1
+- ps:Install-PackageProvider -Name NuGet -Force | Out-Null
+- git config --global credential.helper store
+- ps: Add-Content "$env:USERPROFILE\.git-credentials" "https://$($env:GitHubKey):x-oauth-basic@github.com`n"
+- git config --global user.email "scott@examplenotreal.com"
+- git config --global user.name "deathbyvegemite"
+- ps: . .\Tests\build.ps1
