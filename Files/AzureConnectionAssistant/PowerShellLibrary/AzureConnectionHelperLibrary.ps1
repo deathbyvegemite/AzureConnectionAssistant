@@ -4,7 +4,7 @@ Library to assist with connecting to and validating a connection to an Azure RM 
 v0.9
 
 .DESCRIPTION
-The following functions allows for the saving and retrieving of encrypted credentials from the HKCU context of the logged in user.
+The following functions allows for the saving and retrieving of encrypted credentials from the HKCU context of the logged in user and for connecting or validating a connection to an Azure RM Subscription.
 
 Test-Session:		Initiates a check to see if you are have a current Azure Login session, if it finds you don't, it prompts you to select credentials saved in the Registry.
 

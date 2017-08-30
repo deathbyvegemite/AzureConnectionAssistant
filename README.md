@@ -2,8 +2,12 @@
 This project contains both a PowerShell Module and a Library for assisting with connecting to and validating a connection to an Azure RM Subscription.
 
 To use the module, copy the AzureConnectionAssistant folder from within the Module folder of the project to the following directory - '%Windir%\System32\WindowsPowerShell\v1.0\Modules'
+or
+Install from the PSGallery from an internet connected machine by typing Install-Module -Name AzureConnectionAssistant from an active PowerShell session.
 
 To use the library, save the AzureConnectionHelperLibrary.ps1 file to a local scripting directory and dot source the file into your session.
+
+The AzureRM PowerShell modules are a prerequisite for the connection to Azure.
 
 Created by: Scott Thomas - scott@deathbyvegemite.com
 Copyright (c) 2017. All rights reserved.	
@@ -13,7 +17,7 @@ OF THE USE OR THE RESULTS FROM THE USE OF THIS CODE REMAINS WITH THE USER.
 
 
 ### DESCRIPTION
-The following functions allows for the saving and retrieving of encrypted credentials from the HKLM context of the logged in user and for connecting or validating a connection to an Azure RM Subscription.
+The following functions allows for the saving and retrieving of encrypted credentials from the HKCU context of the logged in user and for connecting or validating a connection to an Azure RM Subscription.
 
 	Test-Session:		Initiates a check to see if you are have a current Azure Login session, if it finds you don't, it prompts you to select credentials saved in the Registry.
 
