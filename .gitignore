@@ -9,6 +9,7 @@
 *.sln
 *.pssproj
 *.tests.ps1
+Build.ps1
 
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
