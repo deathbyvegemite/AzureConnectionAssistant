@@ -62,7 +62,8 @@ else
         # Set up a path to the git.exe cmd, import posh-git to give us control over git, and then push changes to GitHub
         # Note that "update version" is included in the appveyor.yml file's "skip a build" regex to avoid a loop
         $env:Path += ";$env:ProgramFiles\Git\cmd"
-        git add --all
+        git checkout master
+		git add --all
         git status
         git commit -s -m "Update version to $newVersion"
         git push origin master
