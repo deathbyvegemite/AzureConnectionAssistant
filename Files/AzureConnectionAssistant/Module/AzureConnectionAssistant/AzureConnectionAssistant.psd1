@@ -66,8 +66,7 @@ FormatsToProcess = @()
 # NestedModules = @()
 
 # Functions to export from this module
-FunctionsToExport = 
-               'Get-SavedCreds New-AzureRMLogin New-SavedCreds Test-Session Show-SavedCreds Set-SavedCreds'
+FunctionsToExport = '*'
 
 # Cmdlets to export from this module
 CmdletsToExport = @()
@@ -99,7 +98,7 @@ PrivateData = @{
         # LicenseUri = ''
 
         # A URL to the main website for this project.
-        # ProjectUri = ''
+         ProjectUri = 'https://github.com/deathbyvegemite/AzureConnectionAssistant'
 
         # A URL to an icon representing this module.
         # IconUri = ''
