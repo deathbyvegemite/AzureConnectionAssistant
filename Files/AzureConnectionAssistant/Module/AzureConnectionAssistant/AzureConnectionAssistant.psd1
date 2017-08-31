@@ -12,7 +12,7 @@
 RootModule = 'AzureConnectionAssistant.psm1'
 
 # Version number of this module.
-ModuleVersion = '1.0.3.12'
+ModuleVersion = '1.0.3.13'
 
 # ID used to uniquely identify this module
 GUID = '84740243-b6d9-4c70-87f9-5826d288d907'
@@ -66,7 +66,7 @@ FormatsToProcess = @()
 # NestedModules = @()
 
 # Functions to export from this module
-FunctionsToExport = '*'
+FunctionsToExport = '''*'''
 
 # Cmdlets to export from this module
 CmdletsToExport = @()
@@ -98,7 +98,7 @@ PrivateData = @{
         # LicenseUri = ''
 
         # A URL to the main website for this project.
-         ProjectUri = 'https://github.com/deathbyvegemite/AzureConnectionAssistant'
+        ProjectUri = 'https://github.com/deathbyvegemite/AzureConnectionAssistant'
 
         # A URL to an icon representing this module.
         # IconUri = ''
@@ -110,8 +110,8 @@ PrivateData = @{
         # ExternalModuleDependencies = ''
 
     } # End of PSData hashtable
-
-} # End of PrivateData hashtable
+    
+ } # End of PrivateData hashtable
 
 # HelpInfo URI of this module
 # HelpInfoURI = ''
