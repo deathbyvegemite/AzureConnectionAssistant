@@ -62,11 +62,11 @@ else
         # Set up a path to the git.exe cmd, import posh-git to give us control over git, and then push changes to GitHub
         # Note that "update version" is included in the appveyor.yml file's "skip a build" regex to avoid a loop
         $env:Path += ";$env:ProgramFiles\Git\cmd"
-        git checkout master 2>&1
-		git add --all
-        git status
-        git commit -s -m "Update version to $newVersion"
-        git push origin master 2>&1
+        git checkout master --porcelain
+		git add --all --porcelain
+        git status --porcelain
+        git commit -s -m "Update version to $newVersion" --porcelain
+        git push origin master --porcelain
         Write-Host "AzureConnectionAssistant PowerShell Module version $newVersion published to GitHub." -ForegroundColor Cyan
     }
     Catch 
