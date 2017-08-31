@@ -28,7 +28,7 @@ else
         Write-Output "New Version: $newVersion"
 
         # Update the manifest with the new version value and fix the weird string replace bug
-        Update-ModuleManifest -Path $manifestPath -ModuleVersion $newVersion -FunctionsToExport "`'*`'"
+        Update-ModuleManifest -Path $manifestPath -ModuleVersion $newVersion -FunctionsToExport '*'
         (Get-Content -Path $manifestPath) -replace 'PSGet_AzureConnectionAssistant', 'AzureConnectionAssistant' | Set-Content -Path $manifestPath
 		(Get-Content -Path $manifestPath) -replace 'NewManifest', 'AzureConnectionAssistant' | Set-Content -Path $manifestPath
     }
