@@ -66,7 +66,8 @@ FormatsToProcess = @()
 # NestedModules = @()
 
 # Functions to export from this module
-FunctionsToExport = '*'
+#FunctionsToExport = '*'
+FunctionsToExport = @('Test-Session','New-AzureRMLogin','Get-SavedCreds','Show-SavedCreds','New-SavedCreds','Set-SavedCreds')
 
 # Cmdlets to export from this module
 CmdletsToExport = @()
@@ -92,7 +93,7 @@ PrivateData = @{
     PSData = @{
 
         # Tags applied to this module. These help with module discovery in online galleries.
-        Tags = 'Login-AzureRMAccount,AzureRM,SavedCreds'
+        Tags = @('Login-AzureRMAccount','AzureRM','SavedCreds')
 
         # A URL to the license for this module.
         # LicenseUri = ''
