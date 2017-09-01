@@ -12,7 +12,7 @@
 RootModule = 'AzureConnectionAssistant.psm1'
 
 # Version number of this module.
-ModuleVersion = '1.0.3.16'
+ModuleVersion = '1.0.3.17'
 
 # ID used to uniquely identify this module
 GUID = '84740243-b6d9-4c70-87f9-5826d288d907'
@@ -66,7 +66,7 @@ FormatsToProcess = @()
 # NestedModules = @()
 
 # Functions to export from this module
-FunctionsToExport = @('Test-Session','New-AzureRMLogin','Get-SavedCreds','Show-SavedCreds','New-SavedCreds','Set-SavedCreds')
+FunctionsToExport = '*'
 
 # Cmdlets to export from this module
 CmdletsToExport = @()
