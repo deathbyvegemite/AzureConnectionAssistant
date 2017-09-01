@@ -66,8 +66,7 @@ FormatsToProcess = @()
 # NestedModules = @()
 
 # Functions to export from this module
-FunctionsToExport = 
-               'Test-Session New-AzureRMLogin Get-SavedCreds Show-SavedCreds New-SavedCreds Set-SavedCreds'
+FunctionsToExport = '*'
 
 # Cmdlets to export from this module
 CmdletsToExport = @()
