@@ -37,12 +37,18 @@ Copyright (c) 2017. All rights reserved.
 THIS CODE IS MADE AVAILABLE AS IS, WITHOUT WARRANTY OF ANY KIND. THE ENTIRE RISK
 OF THE USE OR THE RESULTS FROM THE USE OF THIS CODE REMAINS WITH THE USER.
 #>
+	[CmdletBinding(SupportsShouldProcess = $true)]
+	Param()
 	trap{Write-Host -f Red "$($_.Exception.Message)"; return $false}
 	$sesh = Get-AzureRmContext -ErrorAction SilentlyContinue
 	if ($Sesh.Environment -like $null)
 	{
 		Write-Host -f Yellow "No session found or no local credentials stored."
 		New-AzureRMLogin
+	}
+	else
+	{
+		return $sesh	
 	}
 }
 
