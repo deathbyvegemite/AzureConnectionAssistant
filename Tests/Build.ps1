@@ -28,7 +28,7 @@ else
         Write-Output "New Version: $newVersion"
 
         # Update the manifest with the new version value and fix the weird string replace bug
-        $Functions = @('Test-Session','New-AzureRMLogin','Get-SavedCreds','Show-SavedCreds','New-SavedCreds','Set-SavedCreds')
+        $Functions = @('Test-Session','New-AzureRMLogin','Get-SavedCreds','Show-SavedCreds','New-SavedCreds','Set-SavedCreds','Remove-SavedCreds')
 		Update-ModuleManifest -Path $manifestPath -ModuleVersion $newVersion -FunctionsToExport $Functions
         (Get-Content -Path $manifestPath) -replace 'PSGet_AzureConnectionAssistant', 'AzureConnectionAssistant' | Set-Content -Path $manifestPath
 		(Get-Content -Path $manifestPath) -replace 'NewManifest', 'AzureConnectionAssistant' | Set-Content -Path $manifestPath
