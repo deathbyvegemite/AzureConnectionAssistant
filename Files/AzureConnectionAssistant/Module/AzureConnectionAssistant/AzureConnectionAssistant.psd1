@@ -67,7 +67,7 @@ FormatsToProcess = @()
 
 # Functions to export from this module
 FunctionsToExport = 'Test-Session', 'New-AzureRMLogin', 'Get-SavedCreds', 'Show-SavedCreds', 
-               'New-SavedCreds', 'Set-SavedCreds'
+               'New-SavedCreds', 'Set-SavedCreds', 'Remove-SavedCreds'
 
 # Cmdlets to export from this module
 CmdletsToExport = @()
@@ -96,7 +96,7 @@ PrivateData = @{
         Tags = 'Login-AzureRMAccount','AzureRM','SavedCreds'
 
         # A URL to the license for this module.
-        # LicenseUri = ''
+        # LicenseUri = 'https://opensource.org/licenses/MIT'
 
         # A URL to the main website for this project.
         ProjectUri = 'https://github.com/deathbyvegemite/AzureConnectionAssistant'
@@ -105,7 +105,7 @@ PrivateData = @{
         # IconUri = ''
 
         # ReleaseNotes of this module
-        # ReleaseNotes = ''
+         ReleaseNotes = 'This update adds the Remove-SavedCreds function to the module.'
 
         # External dependent modules of this module
         # ExternalModuleDependencies = ''

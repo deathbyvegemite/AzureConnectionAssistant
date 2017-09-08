@@ -360,3 +360,60 @@ OF THE USE OR THE RESULTS FROM THE USE OF THIS CODE REMAINS WITH THE USER.
 	}
 	return $objReturn
 }
+
+
+function Remove-SavedCreds
+{
+<#
+.SYNOPSIS
+Function to remove a saved credential.
+
+.DESCRIPTION
+This function will remove a credentail that has been saved in the local users registry.
+
+.PARAMETER CredName
+This is the name of the credential to retrieve from the registry.
+
+.EXAMPLE
+PS C:\> Remove-SavedCreds -CredName MyAzureCreds
+
+Confirm
+Are you sure you want to perform this action?
+Performing the operation "Remove-SavedCreds" on target "Are you sure?".
+[Y] Yes  [A] Yes to All  [N] No  [L] No to All  [S] Suspend  [?] Help (default is "Y"): Y
+MyAzureCreds has been removed
+True
+PS C:\>
+	
+.NOTES
+Created by: Scott Thomas - scott@deathbyvegemite.com
+Copyright (c) 2017. All rights reserved.	
+
+THIS CODE IS MADE AVAILABLE AS IS, WITHOUT WARRANTY OF ANY KIND. THE ENTIRE RISK
+OF THE USE OR THE RESULTS FROM THE USE OF THIS CODE REMAINS WITH THE USER.
+#>
+	[CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = "High")]
+	Param
+	(
+		[Parameter(Mandatory = $true, ValueFromPipeline = $false)][String]$CredName
+	)
+	trap{Write-Host -f Red "$($_.Exception.Message)"; return $false}
+	if ((Test-Path -Path HKCU:\System\CurrentControlSet\SecCreds\$CredName) -eq $false)
+	{
+		Write-Host -f Red "Credential name not found"
+		return $false
+	}
+
+	if ($PSCmdlet.ShouldProcess("Are you sure?"))
+	{
+		$Error.Clear()
+		$toremove = Remove-Item -Path HKCU:\System\CurrentControlSet\SecCreds\$CredName -ErrorAction SilentlyContinue
+		If ($Error.Count -eq 0)
+		{
+			Write-Host -f Yellow "$CredName has been removed"
+			return $true
+		}
+	}
+	Write-Host -f Red "Credentials were not able to be removed"
+	return $false
+}
