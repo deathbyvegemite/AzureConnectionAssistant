@@ -9,6 +9,8 @@ To use the library, save the AzureConnectionHelperLibrary.ps1 file to a local sc
 
 The AzureRM PowerShell modules are a prerequisite for the connection to Azure.
 
+To raise issues or make feature requests - https://github.com/deathbyvegemite/AzureConnectionAssistant/issues
+
 Created by: Scott Thomas - scott@deathbyvegemite.com
 Copyright (c) 2017. All rights reserved.	
 
