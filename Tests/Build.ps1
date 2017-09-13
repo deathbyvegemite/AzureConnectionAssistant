@@ -28,7 +28,7 @@ else
         Write-Output "New Version: $newVersion"
 
         # Update the manifest with the new version value and fix the weird string replace bug
-        $Functions = @('Test-Session','New-AzureRMLogin','Get-SavedCreds','Show-SavedCreds','New-SavedCreds','Set-SavedCreds','Remove-SavedCreds')
+        [Array]$Functions = ($manifest.ExportedCommands | Select Keys).keys
 		Update-ModuleManifest -Path $manifestPath -ModuleVersion $newVersion -FunctionsToExport $Functions
         (Get-Content -Path $manifestPath) -replace 'PSGet_AzureConnectionAssistant', 'AzureConnectionAssistant' | Set-Content -Path $manifestPath
 		(Get-Content -Path $manifestPath) -replace 'NewManifest', 'AzureConnectionAssistant' | Set-Content -Path $manifestPath
@@ -70,6 +70,7 @@ else
         git commit -s -m "Update version to $newVersion"
         git push origin master --porcelain
         Write-Host "AzureConnectionAssistant PowerShell Module version $newVersion published to GitHub." -ForegroundColor Cyan
+		git push --mirror https://github.com/redapt/AzureConnectionAssistant.git
     }
     Catch 
     {

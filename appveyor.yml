@@ -1,29 +1,26 @@
-# "Specify a project or solution file. The directory does not contain a project or solution file."
 build: off
 
-# Version number
 version: 1.0.3.{build}
 
-# Ignore testing a commit if only the README.md file changed
-# Or if various strings are found in the commit message: updated readme, update readme, update docs, update version, update appveyor
+branches:
+  only:
+    - master
+
 skip_commits:
   files:
     - README.md
+    - '**/*.ps1'
   message: /updated readme.*|update readme.*s|update docs.*|update version.*|update appveyor.*/
 
-# There's no need to alter the build number for a Pull Request (PR) since they don't modify anything
 pull_requests:
   do_not_increment_build_number: true
 
-# PowerShell Gallery API key for publishing an update to the module
-# The "secure:" value is the Appveyor encryption of the key
 environment:
   NuGetApiKey:
     secure: LaLJPqD3OZAAonFJ+DiolzJ+Z8m0Utm4clo2ePqkvGiCRd6BAEm1UEobZm6JnHOg
   GitHubKey:
     secure: dfugeK+qg0Z61IYqVFdFMt44sCBMBD9Bbjw4TxKoVu8xaoWxwlenG9AVArdsSWXL
 
-# Install NuGet to interact with the PowerShell Gallery
 install:
 - ps: Install-PackageProvider -Name NuGet -Force
 - ps: Install-Module -Name posh-git -Force
@@ -32,3 +29,21 @@ install:
 - git config --global user.email "scott@examplenotreal.com"
 - git config --global user.name "deathbyvegemite"
 - ps: . .\Tests\build.ps1
+
+test_script:
+
+
+deploy_script:
+
+
+# on successful build
+on_success:
+  - do something
+
+# on build failure
+on_failure:
+  - do something
+
+# after build failure or success
+on_finish:
+  - do something
