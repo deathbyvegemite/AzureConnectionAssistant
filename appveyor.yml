@@ -30,20 +30,8 @@ install:
 - git config --global user.name "deathbyvegemite"
 - ps: . .\Tests\build.ps1
 
-test_script:
+#test_script:
 
 
-deploy_script:
+#deploy_script:
 
-
-# on successful build
-on_success:
-  - do something
-
-# on build failure
-on_failure:
-  - do something
-
-# after build failure or success
-on_finish:
-  - do something
