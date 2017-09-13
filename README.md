@@ -31,6 +31,8 @@ The following functions allows for the saving and retrieving of encrypted creden
 
 	Set-SavedCreds:		Used to update an exisiting stored credentual.
 
+	Remove-SavedCreds:	Used to remove an exisiting stored credential.
+
 
 ### EXAMPLES
 #### Test-Session
@@ -96,5 +98,18 @@ The following functions allows for the saving and retrieving of encrypted creden
 #### Set-SavedCreds
 	PS C:\> $creds = Get-Credential scott@examplenotreal.com
 	PS C:\> Set-SavedCreds -CredName MyAzureCreds -Creds $creds
+	True
+	PS C:\>
+
+
+
+####Remove-SavedCreds
+	PS C:\> Remove-SavedCreds -CredName MyAzureCreds
+	
+	Confirm
+	Are you sure you want to perform this action?
+	Performing the operation "Remove-SavedCreds" on target "Are you sure?".
+	[Y] Yes  [A] Yes to All  [N] No  [L] No to All  [S] Suspend  [?] Help (default is "Y"): Y
+	MyAzureCreds has been removed
 	True
 	PS C:\>
