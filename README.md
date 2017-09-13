@@ -103,7 +103,7 @@ The following functions allows for the saving and retrieving of encrypted creden
 
 
 
-####Remove-SavedCreds
+#### Remove-SavedCreds
 	PS C:\> Remove-SavedCreds -CredName MyAzureCreds
 	
 	Confirm
