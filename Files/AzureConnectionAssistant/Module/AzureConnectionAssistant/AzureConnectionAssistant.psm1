@@ -48,7 +48,10 @@ OF THE USE OR THE RESULTS FROM THE USE OF THIS CODE REMAINS WITH THE USER.
 	}
 	else
 	{
-		return $sesh	
+		if($pscmdlet.ShouldProcess("Test-Session is positive","Return"))
+		{
+			return $sesh
+		}
 	}
 }
 
@@ -99,8 +102,8 @@ OF THE USE OR THE RESULTS FROM THE USE OF THIS CODE REMAINS WITH THE USER.
 	if ((Test-Path -Path HKCU:\System\CurrentControlSet\SecCreds) -eq $false){return $false}
 	if ($ConnectWithDefault)
 	{
-		$Default = (Show-SavedCreds)[0].Name
-		$creds = Get-SavedCreds $Default
+		$Credname = (Show-SavedCreds)[0].Name
+		$creds = Get-SavedCreds $Credname
 	}
 	else
 	{
@@ -110,17 +113,24 @@ OF THE USE OR THE RESULTS FROM THE USE OF THIS CODE REMAINS WITH THE USER.
 		$promptvalue = Read-Host -Prompt "Select: "
 		if ($promptvalue -eq $i)
 		{
-			$return = Login-AzureRmAccount
-			return $return
+			if($pscmdlet.ShouldProcess("Azure - with Federated account"))
+			{
+				$return = Login-AzureRmAccount
+				return $return
+			}
 		}
 		else
 		{ 
 			$CredToConnectTo = (Show-SavedCreds)[($promptvalue - 1)]
+			$Credname = $CredToConnectTo.name
 			$creds = Get-SavedCreds $($CredToConnectTo.name)
 		}
 	}	
-	$return = Login-AzureRmAccount -Credential $creds
-	return $return
+	if($pscmdlet.ShouldProcess("Azure - with $Credname saved credentials"))
+	{
+		$return = Login-AzureRmAccount -Credential $creds
+		return $return
+	}
 }
 
 
@@ -142,26 +152,7 @@ This is an object containing a PSCredential.
 .EXAMPLE
 PS C:\> $creds = Get-Credential scott@examplenotreal.com
 PS C:\> New-SavedCreds -CredName MyAzureCreds -Creds $creds
-	Hive: HKEY_CURRENT_USER\System\CurrentControlSet\SecCreds
-Name                           Property
-----                           --------
-MyAzureCreds
-
-UserName     : scott@examplenotreal.com
-PSPath       : Microsoft.PowerShell.Core\Registry::HKEY_CURRENT_USER\System\CurrentControlSet\SecCreds\MyAzureCreds
-PSParentPath : Microsoft.PowerShell.Core\Registry::HKEY_CURRENT_USER\System\CurrentControlSet\SecCreds
-PSChildName  : MyAzureCreds
-PSDrive      : HKCU
-PSProvider   : Microsoft.PowerShell.Core\Registry
-
-Password     : cAOSp3ihzlAtXC8vSzI9TYBHHpGGIV3SnbCQMJJQMZ7AjPDkcIXL0UpKqZ1tw1TLstQtIsUhGhHsfntYYnz1eKEMAh1vuR5vy9oPRkgNA3LibSINV2Ku4AYIKwwSW5sAefEYaxrxAPOsY2OOgX1B0w6KHUShEpy9U2HQxiOSEk
-			   tDR12J9Ir1q4NCALIvpnfB6iEMFYJfY80bqvyTjmcpTlBpVNbja2rGHeXGj5yzWOeuluSqH6MX9IT963Ruoy1QPYIJSiWN8KIEDvbLs8vciGaU4v3o2G1gajl0KY5iuQ32p8sbwiIU8RzjfPg9Hmi5f3mt
-PSPath       : Microsoft.PowerShell.Core\Registry::HKEY_CURRENT_USER\System\CurrentControlSet\SecCreds\MyAzureCreds
-PSParentPath : Microsoft.PowerShell.Core\Registry::HKEY_CURRENT_USER\System\CurrentControlSet\SecCreds
-PSChildName  : MyAzureCreds
-PSDrive      : HKCU
-PSProvider   : Microsoft.PowerShell.Core\Registry
-
+True
 PS C:\>
 
 This example demonstrates saving a set of credentuals to a variable, then adding that PSCredential to the registry.
@@ -182,13 +173,23 @@ OF THE USE OR THE RESULTS FROM THE USE OF THIS CODE REMAINS WITH THE USER.
 	trap { Write-Host -f Red "$($_.Exception.Message)"; return $false }
 	if ((Test-Path -Path HKCU:\System\CurrentControlSet\SecCreds) -eq $false)
 	{
-		New-Item -Path HKCU:\System\CurrentControlSet\SecCreds
+		$null = New-Item -Path HKCU:\System\CurrentControlSet\SecCreds
 	}
-	New-Item -Path HKCU:\System\CurrentControlSet\SecCreds\$CredName
-	New-ItemProperty -Path HKCU:\System\CurrentControlSet\SecCreds\$CredName -Name UserName -Value $creds.UserName
+	$null = New-Item -Path HKCU:\System\CurrentControlSet\SecCreds\$CredName
+	if($pscmdlet.ShouldProcess("ItemProperty: HKCU:\System\CurrentControlSet\SecCreds\$CredName\UserName","New-ItemProperty"))
+	{
+		$null = New-ItemProperty -Path HKCU:\System\CurrentControlSet\SecCreds\$CredName -Name UserName -Value $creds.UserName
+	}
 	$password = $creds.Password | ConvertFrom-SecureString
-	New-ItemProperty -Path HKCU:\System\CurrentControlSet\SecCreds\$CredName -Name Password -Value $password
-	return $true
+	if($pscmdlet.ShouldProcess("ItemProperty: HKCU:\System\CurrentControlSet\SecCreds\$CredName\Password","New-ItemProperty"))
+	{
+		$null = New-ItemProperty -Path HKCU:\System\CurrentControlSet\SecCreds\$CredName -Name Password -Value $password
+	}
+	if ((Test-Path -Path HKCU:\System\CurrentControlSet\SecCreds\$CredName) -eq $true)
+	{
+		return $true
+	}
+	return $false
 }
 
 
@@ -222,7 +223,7 @@ Copyright (c) 2017. All rights reserved.
 THIS CODE IS MADE AVAILABLE AS IS, WITHOUT WARRANTY OF ANY KIND. THE ENTIRE RISK
 OF THE USE OR THE RESULTS FROM THE USE OF THIS CODE REMAINS WITH THE USER.
 #>
-	[CmdletBinding(SupportsShouldProcess = $true)]
+	[CmdletBinding(SupportsShouldProcess = $false)]
 	Param
 	(
 		[Parameter(Mandatory = $true, ValueFromPipeline = $false)][String]$CredName
@@ -245,7 +246,7 @@ OF THE USE OR THE RESULTS FROM THE USE OF THIS CODE REMAINS WITH THE USER.
 }
 
 
-function Set-SavedCreds
+function Update-SavedCreds
 {
 <#
 .SYNOPSIS
@@ -262,7 +263,7 @@ This is an object containing a new PSCredential.
 
 .EXAMPLE
 PS C:\> $creds = Get-Credential scott@examplenotreal.com
-PS C:\> Set-SavedCreds -CredName MyAzureCreds -Creds $creds
+PS C:\> Update-SavedCreds -CredName MyAzureCreds -Creds $creds
 True
 PS C:\>
 
@@ -275,7 +276,7 @@ Copyright (c) 2017. All rights reserved.
 THIS CODE IS MADE AVAILABLE AS IS, WITHOUT WARRANTY OF ANY KIND. THE ENTIRE RISK
 OF THE USE OR THE RESULTS FROM THE USE OF THIS CODE REMAINS WITH THE USER.
 #>
-	[CmdletBinding(SupportsShouldProcess = $true)]
+	[CmdletBinding(SupportsShouldProcess = $false)]
 	Param
 	(
 		[Parameter(Mandatory = $true, ValueFromPipeline = $false)][String]$CredName,
@@ -330,7 +331,7 @@ Copyright (c) 2017. All rights reserved.
 THIS CODE IS MADE AVAILABLE AS IS, WITHOUT WARRANTY OF ANY KIND. THE ENTIRE RISK
 OF THE USE OR THE RESULTS FROM THE USE OF THIS CODE REMAINS WITH THE USER.
 #>
-	[CmdletBinding(SupportsShouldProcess = $true)]
+	[CmdletBinding(SupportsShouldProcess = $false)]
 	Param
 	(
 		[Parameter(Mandatory = $false, ValueFromPipeline = $false)][Switch]$ShowPasswords = $false

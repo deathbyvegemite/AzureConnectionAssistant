@@ -67,7 +67,7 @@ FormatsToProcess = @()
 
 # Functions to export from this module
 FunctionsToExport = 'Test-Session', 'New-AzureRMLogin', 'Get-SavedCreds', 'Show-SavedCreds', 
-               'New-SavedCreds', 'Set-SavedCreds', 'Remove-SavedCreds'
+               'New-SavedCreds', 'Update-SavedCreds', 'Remove-SavedCreds'
 
 # Cmdlets to export from this module
 CmdletsToExport = @()
@@ -105,7 +105,7 @@ PrivateData = @{
         # IconUri = ''
 
         # ReleaseNotes of this module
-        ReleaseNotes = 'This update adds the Remove-SavedCreds function to the module.'
+        ReleaseNotes = 'Updates to functions to fully support whatif, in addition to preparing them for upgraded Pester testing. Additionally, I have updated Set-SavedCreds to be Update-SavedCreds which tends to make more sense.'
 
         # External dependent modules of this module
         # ExternalModuleDependencies = ''

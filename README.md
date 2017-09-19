@@ -9,6 +9,8 @@ To use the library, save the AzureConnectionHelperLibrary.ps1 file to a local sc
 
 The AzureRM PowerShell modules are a prerequisite for the connection to Azure.
 
+PLEASE NOTE: As of v0.9, the Library version of this project is not being updated.
+
 To raise issues or make feature requests - https://github.com/deathbyvegemite/AzureConnectionAssistant/issues
 
 Created by: Scott Thomas - scott@deathbyvegemite.com
@@ -31,7 +33,7 @@ The following functions allows for the saving and retrieving of encrypted creden
 
 	New-SavedCreds:		Used to add a new credential set to the registry.
 
-	Set-SavedCreds:		Used to update an exisiting stored credentual.
+	Update-SavedCreds:		Used to update an exisiting stored credentual.
 
 	Remove-SavedCreds:	Used to remove an exisiting stored credential.
 
@@ -75,35 +77,16 @@ The following functions allows for the saving and retrieving of encrypted creden
 #### New-SavedCreds
 	PS C:\> $creds = Get-Credential scott@examplenotreal.com
 	PS C:\> New-SavedCreds -CredName MyAzureCreds -Creds $creds
-		Hive: HKEY_CURRENT_USER\System\CurrentControlSet\SecCreds
-	Name                           Property
-	----                           --------
-	MyAzureCreds
-
-	UserName     : scott@examplenotreal.com
-	PSPath       : Microsoft.PowerShell.Core\Registry::HKEY_CURRENT_USER\System\CurrentControlSet\SecCreds\MyAzureCreds
-	PSParentPath : Microsoft.PowerShell.Core\Registry::HKEY_CURRENT_USER\System\CurrentControlSet\SecCreds
-	PSChildName  : MyAzureCreds
-	PSDrive      : HKCU
-	PSProvider   : Microsoft.PowerShell.Core\Registry
-
-	Password     : cAOSp3ihzlAtXC8vSzI9TYBHHpGGIV3SnbCQMJJQMZ7AjPDkcIXL0UpKqZ1tw1TLstQtIsUhGhHsfntYYnz1eKEMAh1vuR5vy9oPRkgNA3LibSINV2Ku4AYIKwwSW5sAefEYaxrxAPOsY2OOgX1B0w6KHUShEpy9U2HQxiOSEk
-				   tDR12J9Ir1q4NCALIvpnfB6iEMFYJfY80bqvyTjmcpTlBpVNbja2rGHeXGj5yzWOeuluSqH6MX9IT963Ruoy1QPYIJSiWN8KIEDvbLs8vciGaU4v3o2G1gajl0KY5iuQ32p8sbwiIU8RzjfPg9Hmi5f3mt
-	PSPath       : Microsoft.PowerShell.Core\Registry::HKEY_CURRENT_USER\System\CurrentControlSet\SecCreds\MyAzureCreds
-	PSParentPath : Microsoft.PowerShell.Core\Registry::HKEY_CURRENT_USER\System\CurrentControlSet\SecCreds
-	PSChildName  : MyAzureCreds
-	PSDrive      : HKCU
-	PSProvider   : Microsoft.PowerShell.Core\Registry
-
-	PS C:\>
-
-#### Set-SavedCreds
-	PS C:\> $creds = Get-Credential scott@examplenotreal.com
-	PS C:\> Set-SavedCreds -CredName MyAzureCreds -Creds $creds
 	True
+
 	PS C:\>
 
+#### Update-SavedCreds
+	PS C:\> $creds = Get-Credential scott@examplenotreal.com
+	PS C:\> Update-SavedCreds -CredName MyAzureCreds -Creds $creds
+	True
 
+	PS C:\>
 
 #### Remove-SavedCreds
 	PS C:\> Remove-SavedCreds -CredName MyAzureCreds
@@ -114,4 +97,5 @@ The following functions allows for the saving and retrieving of encrypted creden
 	[Y] Yes  [A] Yes to All  [N] No  [L] No to All  [S] Suspend  [?] Help (default is "Y"): Y
 	MyAzureCreds has been removed
 	True
+
 	PS C:\>

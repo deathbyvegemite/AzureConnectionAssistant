@@ -20,7 +20,7 @@ LONG DESCRIPTION
 
 	New-SavedCreds:		Used to add a new credential set to the registry.
 
-	Set-SavedCreds:		Used to update an exisiting stored credentual.
+	Update-SavedCreds:		Used to update an exisiting stored credentual.
 
 	Remove-SavedCreds:	Used to remove an exisiting stored credential.
 
@@ -71,32 +71,11 @@ EXAMPLES
 #New-SavedCreds
 	PS C:\> $creds = Get-Credential scott@examplenotreal.com
 	PS C:\> New-SavedCreds -CredName MyAzureCreds -Creds $creds
-		Hive: HKEY_CURRENT_USER\System\CurrentControlSet\SecCreds
-	Name                           Property
-	----                           --------
-	MyAzureCreds
-
-	UserName     : scott@examplenotreal.com
-	PSPath       : Microsoft.PowerShell.Core\Registry::HKEY_CURRENT_USER\System\CurrentControlSet\SecCreds\MyAzureCreds
-	PSParentPath : Microsoft.PowerShell.Core\Registry::HKEY_CURRENT_USER\System\CurrentControlSet\SecCreds
-	PSChildName  : MyAzureCreds
-	PSDrive      : HKCU
-	PSProvider   : Microsoft.PowerShell.Core\Registry
-
-	Password     : cAOSp3ihzlAtXC8vSzI9TYBHHpGGIV3SnbCQMJJQMZ7AjPDkcIXL0UpKqZ1tw1TLstQtIsUhGhHsfntYYnz1eKEMAh1vuR5vy9o
-				   PRkgNA3LibSINV2Ku4AYIKwwSW5sAefEYaxrxAPOsY2OOgX1B0w6KHUShEpy9U2HQxiOSEktDR12J9Ir1q4NCALIvpnfB6iEMFY
-				   JfY80bqvyTjmcpTlBpVNbja2rGHeXGj5yzWOeuluSqH6MX9IT963Ruoy1QPYIJSiWN8KIEDvbLs8vciGaU4v3o2G1gajl0KY5iu
-				   Q32p8sbwiIU8RzjfPg9Hmi5f3mt
-	PSPath       : Microsoft.PowerShell.Core\Registry::HKEY_CURRENT_USER\System\CurrentControlSet\SecCreds\MyAzureCreds
-	PSParentPath : Microsoft.PowerShell.Core\Registry::HKEY_CURRENT_USER\System\CurrentControlSet\SecCreds
-	PSChildName  : MyAzureCreds
-	PSDrive      : HKCU
-	PSProvider   : Microsoft.PowerShell.Core\Registry
-
+	True
 	PS C:\>
 
 
-#Set-SavedCreds
+#Update-SavedCreds
 	PS C:\> $creds = Get-Credential scott@examplenotreal.com
 	PS C:\> Set-SavedCreds -CredName MyAzureCreds -Creds $creds
 	True
