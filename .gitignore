@@ -32,3 +32,7 @@ google-services.json
 
 # Android Profiling
 *.hprof
+
+# Release signing config read by app/build.gradle.kts. Holds the keystore and
+# key passwords in plaintext, so it must never be committed.
+keystore.properties

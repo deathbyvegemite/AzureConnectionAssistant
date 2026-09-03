@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  A patrol log is exactly the sort of thing that should not quietly end up in a
+  cloud backup. Nothing here is eligible for backup or device-to-device transfer;
+  use the in-app export if you want a copy.
+-->
+<full-backup-content>
+    <exclude domain="database" path="." />
+    <exclude domain="sharedpref" path="." />
+    <exclude domain="file" path="." />
+</full-backup-content>
