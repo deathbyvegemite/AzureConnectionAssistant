@@ -60,6 +60,55 @@ a finding — poor light shifts colour badly.
 `TabColorCycle.candidateYears()` returns a *list* of years and there is deliberately no
 function anywhere that turns a colour into one year. The API shape is the documentation.
 
+### The vehicle gate
+
+Early field testing turned up a failure mode no amount of tuning the plate parser
+would have fixed: the phone, propped up and pointed at a screen, read plates out of
+whatever was *playing* on that screen. A dashcam-compilation video's caption ("...the
+2 idiots at the front stopped..."), its own title card ("30 Minutes of Road Rage"), a
+speedometer overlay ("87 MPH"), even a YouTube search box — all of it produced runs of
+characters that happened to fit a plate mask, because the mask only ever checks
+character *classes*. It has no way to know the text came from a video rather than a
+windscreen.
+
+That is not a bug in the parser to chase — the parser is doing exactly what it is for,
+which is turning plausible characters into a plausible plate. The missing check is
+upstream of it entirely: **is there even a vehicle in this frame at all.**
+
+So a second, independent model runs first: a bundled
+[EfficientDet-Lite0](https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/int8/1/efficientdet_lite0.tflite)
+object detector (Apache 2.0, ~4.4 MB, on-device, no network) looks for a car, truck,
+bus or motorcycle. Text is only ever considered a plate candidate if it sits on, or
+just below, a detected vehicle's own bounding box — see `VehicleGate` in `:core`,
+which does that geometry and is the thing the unit tests exercise directly: text
+above a vehicle (a caption), beside it at the wrong height, or with no vehicle in
+frame at all, is rejected before the plate parser ever sees it.
+
+This is **on by default**, and it is not free: running a detector on every analysed
+frame costs real cycles per second, which is a deliberate trade — a wrong plate
+sitting in a neighbourhood-watch log is worse than a slower one. It can be switched
+off in Settings if a particular deployment needs the throughput back and accepts the
+risk.
+
+Two things worth knowing about what it does and doesn't cover:
+
+- **It is a general-purpose detector, not a plate detector.** It answers "is a
+  vehicle here", not "is that text actually on this vehicle's plate" — the
+  `VehicleGate` region is generous by design (widened sideways, extended well below
+  the detected box) because a detector's box is drawn around the body, not the plate,
+  and is often tight to the bumper.
+- **It cannot tell a real car from a video of a car.** A vehicle detector answers
+  "does this look like a vehicle," and a car in a dashcam video looks exactly like a
+  car. What it *does* fix is every case where the on-screen content contains no
+  vehicle at all — captions, titles, overlays, search boxes — which was the entire
+  observed failure mode. Distinguishing a live vehicle from a screen showing one is a
+  different, harder problem and out of scope here.
+
+As a side effect of running a vehicle detector at all, its label (car / truck / bus /
+motorcycle) fills a sighting's body type automatically when the gate finds one
+confidently near the plate — one less field to type in by hand on the detail screen,
+and it's still just as editable there if it's wrong.
+
 ### Getting the best image of the plate
 
 Written for a Galaxy S25 Ultra, though nothing here is Samsung-specific.
@@ -136,7 +185,7 @@ CameraX frame  ──►  ML Kit text recognition  ──►  PlateTextParser  �
     to N fps)                                                             dedup)                 crops)
 ```
 
-Four ideas do most of the work:
+Five ideas do most of the work:
 
 **Mask-driven OCR repair.** A recogniser cannot tell a letter `O` from a digit `0` —
 on a plate they are often the same glyph. But if you know the region's layouts, you
@@ -160,8 +209,14 @@ across frames, and the app points the camera's focus and exposure at it and zoom
 towards it when — and only when — that would help. See *Getting the best image of
 the plate* below for why "see a plate, zoom in" is the wrong rule and what replaces it.
 
+**Confirming a vehicle is actually there.** A run of characters that fits a plate
+mask is not evidence of a plate — it is evidence that *something* in frame produced
+plate-shaped text. See *The vehicle gate* below for what that looks like in practice
+and why the fix runs a second, independent model rather than trying to make the text
+parser smarter.
+
 The whole of that logic lives in `:core`, a plain Kotlin module with no Android
-dependencies, covered by 106 unit tests. Run them on a laptop in seconds:
+dependencies, covered by 119 unit tests. Run them on a laptop in seconds:
 
 ```bash
 ./gradlew :core:test
@@ -240,6 +295,8 @@ Everything below is in Settings, and takes effect immediately.
 | Tab date never populated | Expected at speed — tabs only read close up. Nothing to tune |
 | Zoom hunting or flapping | Lower **maximum automatic zoom**; the phone may switch lenses below the default |
 | Plates washing out at night | Turn on **meter on the plate** if off; try **exposure bias** at −2 |
+| Plates from a video, sign or screen getting logged | Make sure **confirm a vehicle before reading a plate** is on (it is by default) |
+| Frame rate feels low with the vehicle gate on | Expected — a detector now runs on every analysed frame. Drop **analysis resolution**, or turn the gate off and accept the risk |
 
 ---
 
@@ -280,11 +337,11 @@ core/                       Pure Kotlin. No Android. Fully unit tested.
   sighting/                 Multi-frame consensus, dedup, geo maths
   color/                    Body colour estimation from a pixel patch
   tab/                      Registration tab: text parsing, expiry, colour cross-check
-  tracking/                 Plate tracker, zoom and metering policies, frame geometry
+  tracking/                 Plate tracker, zoom/metering policies, frame geometry, the vehicle gate
   export/                   CSV and JSON writers (locale-safe)
 
 app/
-  capture/                  CameraX analyser, alerts, VehicleClassifier hook
+  capture/                  CameraX analyser, alerts, vehicle detector (gate), VehicleClassifier hook
   data/db/                  Room entities, DAOs
   data/repo/                Repository, crop storage
   data/prefs/               DataStore settings
@@ -298,6 +355,9 @@ app/
 - Night-time accuracy is poor without street lighting. The torch helps at a standstill
   and not at all at speed.
 - Motorbike plates, and plates on a steep angle, are largely missed.
+- The vehicle gate cannot distinguish a real vehicle from a video or photo of one —
+  see *The vehicle gate* above. It fixes the observed failure mode (on-screen text
+  with no vehicle in it at all being read as a plate), not every conceivable one.
 - Registration tabs are usually unreadable from a moving car. The field stays blank
   rather than being filled with a guess, and that is the intended behaviour.
 - Tab reading assumes the month and year are printed on a single tab on the rear plate,

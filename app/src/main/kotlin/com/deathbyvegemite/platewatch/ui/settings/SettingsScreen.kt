@@ -70,6 +70,17 @@ fun SettingsScreen(onBack: () -> Unit) {
         ) {
             SectionHeader("Camera")
 
+            SwitchSetting(
+                title = "Confirm a vehicle before reading a plate",
+                checked = settings.requireVehicleDetection,
+                explanation = "Runs a vehicle detector on every frame and refuses to trust any text as a " +
+                    "plate unless it sits near an actual car, truck, bus or motorcycle. Without this, " +
+                    "anything that produces plate-shaped text \u2014 a caption in a video playing on a " +
+                    "propped-up phone screen, a road sign, a search box \u2014 can be logged as a real " +
+                    "plate. Costs real cycles per second; on by default anyway, because a wrong plate in " +
+                    "the log is worse than a slower one.",
+            ) { edit { s -> s.copy(requireVehicleDetection = it) } }
+
             ResolutionPicker(settings.analysisResolution) { id -> edit { it.copy(analysisResolution = id) } }
 
             SwitchSetting(

@@ -10,6 +10,7 @@ import com.deathbyvegemite.platewatch.capture.AnalyzerConfig
 import com.deathbyvegemite.platewatch.capture.CameraControls
 import com.deathbyvegemite.platewatch.capture.HiResCropper
 import com.deathbyvegemite.platewatch.capture.PlateFrameResult
+import com.deathbyvegemite.platewatch.capture.VehicleDetector
 import com.deathbyvegemite.platewatch.core.plate.PlateRegions
 import com.deathbyvegemite.platewatch.core.plate.PlateTextParser
 import com.deathbyvegemite.platewatch.core.sighting.AggregateResult
@@ -112,6 +113,15 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
     private var controls: CameraControls? = null
     private var tickerJob: Job? = null
 
+    /**
+     * Built once, on first use, not per config call — loading the model is real
+     * work and [analyzerConfig] runs on every analysed frame. `isInitialized()`
+     * lets [onCleared] release it without forcing that load if the gate was never
+     * turned on for this session.
+     */
+    private val vehicleDetectorLazy = lazy { VehicleDetector(application) }
+    private val vehicleDetector by vehicleDetectorLazy
+
     @Volatile
     private var currentZoom = 1f
     private var lastRotationDegrees = 0
@@ -157,6 +167,11 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
         wantCrops = settings.savePhotos,
         tabParser = if (settings.readTabs) TabTextParser(LocalDate.now().year) else null,
         zoomRatio = currentZoom,
+        // Checking isAvailable, not just the setting, matters: if the model asset
+        // is ever missing or fails to load, this falls back to the gate being off
+        // rather than to "no vehicle ever found" — which would silently stop the
+        // app from logging anything at all.
+        vehicleDetector = if (settings.requireVehicleDetection && vehicleDetector.isAvailable) vehicleDetector else null,
     )
 
     /** Called from the camera analysis thread. Must not block. */
@@ -342,6 +357,7 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
             bearingDegrees = fix?.takeIf { it.hasBearing() }?.bearing,
             address = null,
             vehicleColor = frame.colorName,
+            vehicleBodyType = frame.bodyType,
             tabMonth = frame.tabReading?.month,
             tabYear = frame.tabReading?.year,
             tabStatus = tabStatus.name,
@@ -432,6 +448,7 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
         container.locationTracker.stop()
         frames.close()
         observations.close()
+        if (vehicleDetectorLazy.isInitialized()) vehicleDetector.close()
     }
 
     private companion object {

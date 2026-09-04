@@ -8,6 +8,7 @@ import com.deathbyvegemite.platewatch.core.tracking.NormalizedBox
 import com.deathbyvegemite.platewatch.core.tracking.PlateObservation
 import com.deathbyvegemite.platewatch.core.tracking.PlateTracker
 import com.deathbyvegemite.platewatch.core.tracking.ZoomPolicy
+import com.deathbyvegemite.platewatch.core.tracking.VehicleGate
 import com.deathbyvegemite.platewatch.core.tracking.ZoomPolicyConfig
 import kotlin.math.abs
 import kotlin.test.Test
@@ -314,5 +315,108 @@ class MeteringPolicyTest {
         p.decide(track(0.5f, 0.5f), 1f, 0)
         assertEquals(MeteringDecision.Cancel, p.decide(null, 1f, 100))
         assertEquals(MeteringDecision.Hold, p.decide(null, 1f, 200))
+    }
+}
+
+class NormalizedBoxOverlapTest {
+
+    @Test
+    fun `identical boxes overlap`() {
+        val box = NormalizedBox(0.2f, 0.2f, 0.5f, 0.5f)
+        assertTrue(box.overlaps(box))
+    }
+
+    @Test
+    fun `boxes that share area overlap`() {
+        assertTrue(NormalizedBox(0f, 0f, 0.5f, 0.5f).overlaps(NormalizedBox(0.3f, 0.3f, 0.8f, 0.8f)))
+    }
+
+    @Test
+    fun `boxes that merely touch at an edge do not overlap`() {
+        // Sharing a boundary is not sharing area — this is a strict inequality test.
+        assertTrue(!NormalizedBox(0f, 0f, 0.5f, 0.5f).overlaps(NormalizedBox(0.5f, 0f, 1f, 0.5f)))
+    }
+
+    @Test
+    fun `disjoint boxes do not overlap`() {
+        assertTrue(!NormalizedBox(0f, 0f, 0.2f, 0.2f).overlaps(NormalizedBox(0.8f, 0.8f, 1f, 1f)))
+    }
+}
+
+class VehicleGateTest {
+
+    /** A vehicle box roughly the shape a detector draws: wider than tall, lower half of frame. */
+    private fun vehicle(cx: Float, cy: Float, w: Float = 0.4f, h: Float = 0.25f) =
+        NormalizedBox(cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2)
+
+    @Test
+    fun `text sitting on the vehicle's own box is near it`() {
+        val car = vehicle(0.5f, 0.6f)
+        val plateText = NormalizedBox(0.45f, 0.68f, 0.55f, 0.72f)  // near the bottom edge
+        assertTrue(VehicleGate.isNearAVehicle(plateText, listOf(car)))
+    }
+
+    @Test
+    fun `text just below the vehicle box is near it`() {
+        // The real case: a tight bumper-to-bumper bbox with the plate sitting just
+        // under its lower edge.
+        val car = vehicle(0.5f, 0.5f)
+        val bottom = car.bottom
+        val plateText = NormalizedBox(0.45f, bottom + 0.02f, 0.55f, bottom + 0.06f)
+        assertTrue(VehicleGate.isNearAVehicle(plateText, listOf(car)))
+    }
+
+    @Test
+    fun `text well below the vehicle is not near it`() {
+        val car = vehicle(0.5f, 0.3f, h = 0.15f)
+        val farBelow = NormalizedBox(0.45f, 0.9f, 0.55f, 0.95f)
+        assertTrue(!VehicleGate.isNearAVehicle(farBelow, listOf(car)))
+    }
+
+    @Test
+    fun `a caption above the vehicle is not near it`() {
+        // This is the actual failure mode from the field: a dashcam-compilation
+        // video's caption text sits well above wherever a car is in the frame.
+        val car = vehicle(0.5f, 0.75f)
+        val caption = NormalizedBox(0.05f, 0.05f, 0.95f, 0.18f)
+        assertTrue(!VehicleGate.isNearAVehicle(caption, listOf(car)))
+    }
+
+    @Test
+    fun `text beside the vehicle, not at plate height, is not near it`() {
+        val car = vehicle(0.3f, 0.5f)
+        val sideText = NormalizedBox(0.75f, 0.1f, 0.95f, 0.2f)
+        assertTrue(!VehicleGate.isNearAVehicle(sideText, listOf(car)))
+    }
+
+    @Test
+    fun `no vehicles at all means nothing is ever near one`() {
+        val plateText = NormalizedBox(0.4f, 0.6f, 0.6f, 0.65f)
+        assertTrue(!VehicleGate.isNearAVehicle(plateText, emptyList()))
+    }
+
+    @Test
+    fun `matches any one of several vehicles`() {
+        val near = vehicle(0.2f, 0.5f)
+        val far = vehicle(0.9f, 0.9f, h = 0.1f)
+        val textNearFirst = NormalizedBox(0.15f, 0.6f, 0.25f, 0.64f)
+        assertTrue(VehicleGate.isNearAVehicle(textNearFirst, listOf(far, near)))
+    }
+
+    @Test
+    fun `the search region widens sideways and extends downward, not upward`() {
+        val car = vehicle(0.5f, 0.5f, w = 0.2f, h = 0.2f)
+        val region = VehicleGate.plateSearchRegion(car)
+        assertTrue(region.left < car.left, "should widen left")
+        assertTrue(region.right > car.right, "should widen right")
+        assertTrue(region.bottom > car.bottom, "should extend below")
+        assertTrue(region.top == car.top, "should not reach above the vehicle")
+    }
+
+    @Test
+    fun `the search region is clamped to the frame`() {
+        val car = vehicle(0.05f, 0.95f, w = 0.3f, h = 0.3f)
+        val region = VehicleGate.plateSearchRegion(car)
+        assertTrue(region.left >= 0f && region.right <= 1f && region.bottom <= 1f)
     }
 }

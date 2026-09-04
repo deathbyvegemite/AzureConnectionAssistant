@@ -48,6 +48,16 @@ data class CaptureSettings(
     val exposureBias: Int = 0,
     /** Take a full-resolution still when a plate is confirmed and keep that crop. */
     val hiResStills: Boolean = true,
+
+    /**
+     * Confirm an actual vehicle is in frame before any text near it is trusted as a
+     * plate. Without this, anything that produces plate-shaped text — a caption in a
+     * video playing on a phone screen propped in view, a road sign, a search box —
+     * can be logged as a real plate. On by default; the cost is a vehicle-detector
+     * pass on every analysed frame, which costs real cycles per second in exchange
+     * for not logging things that were never a plate.
+     */
+    val requireVehicleDetection: Boolean = true,
 ) {
     fun toAggregatorConfig(): AggregatorConfig = AggregatorConfig(
         minConfirmations = minConfirmations.coerceAtLeast(1),

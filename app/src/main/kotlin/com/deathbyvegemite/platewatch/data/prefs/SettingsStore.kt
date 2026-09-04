@@ -48,6 +48,7 @@ class SettingsStore(private val context: Context) {
             plateMetering = p[Keys.PLATE_METERING] ?: d.plateMetering,
             exposureBias = p[Keys.EXPOSURE_BIAS] ?: d.exposureBias,
             hiResStills = p[Keys.HI_RES_STILLS] ?: d.hiResStills,
+            requireVehicleDetection = p[Keys.REQUIRE_VEHICLE] ?: d.requireVehicleDetection,
         )
     }
 
@@ -73,6 +74,7 @@ class SettingsStore(private val context: Context) {
         p[Keys.PLATE_METERING] = s.plateMetering
         p[Keys.EXPOSURE_BIAS] = s.exposureBias
         p[Keys.HI_RES_STILLS] = s.hiResStills
+        p[Keys.REQUIRE_VEHICLE] = s.requireVehicleDetection
     }
 
     private object Keys {
@@ -97,5 +99,6 @@ class SettingsStore(private val context: Context) {
         val PLATE_METERING = booleanPreferencesKey("plate_metering")
         val EXPOSURE_BIAS = intPreferencesKey("exposure_bias")
         val HI_RES_STILLS = booleanPreferencesKey("hi_res_stills")
+        val REQUIRE_VEHICLE = booleanPreferencesKey("require_vehicle_detection")
     }
 }
