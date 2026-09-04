@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.deathbyvegemite.platewatch.core.plate.PlateRegions
 import com.deathbyvegemite.platewatch.data.prefs.CaptureSettings
+import com.deathbyvegemite.platewatch.ui.capture.AnalysisResolution
 import com.deathbyvegemite.platewatch.ui.rememberAppContainer
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
@@ -67,6 +68,51 @@ fun SettingsScreen(onBack: () -> Unit) {
         Column(
             Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         ) {
+            SectionHeader("Camera")
+
+            ResolutionPicker(settings.analysisResolution) { id -> edit { it.copy(analysisResolution = id) } }
+
+            SwitchSetting(
+                title = "Follow and zoom on plates",
+                checked = settings.autoZoom,
+                explanation = "Tracks a plate and zooms towards it \u2014 but only when it is near the centre, " +
+                    "not crossing the frame, and would actually read better. Lets go the moment it is lost.",
+            ) { edit { s -> s.copy(autoZoom = it) } }
+
+            SliderSetting(
+                title = "Maximum automatic zoom",
+                value = settings.maxAutoZoom,
+                range = 1f..5f,
+                steps = 7,
+                display = "${"%.1f".format(settings.maxAutoZoom)}\u00d7",
+                explanation = "2.5\u00d7 keeps a Galaxy S25 Ultra on its main sensor. Past about 3\u00d7 it switches to " +
+                    "the telephoto lens, which refocuses and re-exposes \u2014 a few hundred milliseconds " +
+                    "of unreadable frames at exactly the wrong moment.",
+            ) { edit { s -> s.copy(maxAutoZoom = it) } }
+
+            SwitchSetting(
+                title = "Meter on the plate",
+                checked = settings.plateMetering,
+                explanation = "Points focus and exposure at the plate instead of the road. Plates are " +
+                    "retro-reflective, so under headlights default metering turns them into a white slab.",
+            ) { edit { s -> s.copy(plateMetering = it) } }
+
+            SliderSetting(
+                title = "Exposure bias",
+                value = settings.exposureBias.toFloat(),
+                range = -6f..6f,
+                steps = 11,
+                display = if (settings.exposureBias > 0) "+${settings.exposureBias}" else "${settings.exposureBias}",
+                explanation = "Camera exposure steps. Try \u22122 at night if plates are still washing out.",
+            ) { edit { s -> s.copy(exposureBias = it.roundToInt()) } }
+
+            SwitchSetting(
+                title = "Full-resolution plate photo",
+                checked = settings.hiResStills,
+                explanation = "Takes a still when a plate is confirmed and keeps that crop instead of the " +
+                    "live-frame one. Several times the pixels across the plate; no effect on the log itself.",
+            ) { edit { s -> s.copy(hiResStills = it) } }
+
             SectionHeader("Reading")
 
             RegionPicker(settings.regionId) { id -> edit { it.copy(regionId = id) } }
@@ -210,6 +256,31 @@ private fun RegionPicker(selectedId: String, onSelect: (String) -> Unit) {
                 DropdownMenuItem(
                     text = { Text(region.label) },
                     onClick = { open = false; onSelect(region.id) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ResolutionPicker(selectedId: String, onSelect: (String) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    val selected = AnalysisResolution.byId(selectedId)
+
+    Column(Modifier.fillMaxWidth().clickable { open = true }.padding(vertical = 10.dp)) {
+        Text("Analysis resolution", fontWeight = FontWeight.Medium)
+        Text(selected.label, fontSize = 13.sp, color = MaterialTheme.colorScheme.primary)
+        Text(
+            "How much of the sensor the recogniser sees. Plate glyphs are small: 1080p reads " +
+                "noticeably further than 720p on a Galaxy S25 Ultra and the phone barely notices.",
+            fontSize = 12.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            AnalysisResolution.entries.forEach { option ->
+                DropdownMenuItem(
+                    text = { Text(option.label) },
+                    onClick = { open = false; onSelect(option.id) },
                 )
             }
         }

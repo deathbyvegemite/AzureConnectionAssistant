@@ -45,7 +45,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -130,6 +129,7 @@ fun CaptureScreen(
             callbackExecutor = analysisExecutor,
             config = viewModel::analyzerConfig,
             onResult = viewModel::onFrameResult,
+            onObservation = viewModel::onObservation,
         )
     }
 
@@ -142,21 +142,31 @@ fun CaptureScreen(
 
     var camera by remember { mutableStateOf<Camera?>(null) }
     var torchOn by remember { mutableStateOf(false) }
-    var zoom by remember { mutableFloatStateOf(0f) }
+
+    val resolution = AnalysisResolution.byId(state.settings.analysisResolution)
+    val wantStills = state.settings.hiResStills && state.settings.savePhotos
 
     // Rebinding on `running` means an idle app is not feeding frames to the recogniser.
-    LaunchedEffect(state.running) {
-        camera = bindCamera(
+    // The bound camera is handed to the view model, which owns zoom and metering.
+    LaunchedEffect(state.running, resolution, wantStills) {
+        val bound = bindCamera(
             context = context,
             lifecycleOwner = lifecycleOwner,
             previewView = previewView,
             analyzer = if (state.running) analyzer else null,
             analysisExecutor = analysisExecutor,
+            resolution = resolution,
+            wantStills = wantStills,
         )
+        camera = bound?.camera
+        viewModel.attachControls(bound?.let { CameraXControls(it, analysisExecutor) })
+    }
+
+    DisposableEffect(Unit) {
+        onDispose { viewModel.attachControls(null) }
     }
 
     LaunchedEffect(camera, torchOn) { camera?.cameraControl?.enableTorch(torchOn) }
-    LaunchedEffect(camera, zoom) { camera?.cameraControl?.setLinearZoom(zoom.coerceIn(0f, 1f)) }
 
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         AndroidView(factory = { previewView }, modifier = Modifier.fillMaxSize())
@@ -167,6 +177,8 @@ fun CaptureScreen(
             hasFix = state.hasLocationFix,
             accuracy = state.locationAccuracyMeters,
             pending = state.pendingPlates,
+            zoomRatio = state.zoomRatio,
+            tracking = state.tracking,
             torchOn = torchOn,
             onToggleTorch = { torchOn = !torchOn },
             onOpenLog = onOpenLog,
@@ -185,8 +197,10 @@ fun CaptureScreen(
         ControlPanel(
             running = state.running,
             recent = state.recent,
-            zoom = zoom,
-            onZoomChange = { zoom = it },
+            autoZoom = state.settings.autoZoom,
+            zoomRatio = state.zoomRatio,
+            maxZoom = state.settings.maxAutoZoom,
+            onZoomChange = viewModel::onManualZoom,
             onToggleRunning = {
                 if (state.running) viewModel.onCaptureStopped() else viewModel.onCaptureStarted()
             },
@@ -225,6 +239,8 @@ private fun StatusBar(
     hasFix: Boolean,
     accuracy: Float?,
     pending: List<String>,
+    zoomRatio: Float,
+    tracking: Boolean,
     torchOn: Boolean,
     onToggleTorch: () -> Unit,
     onOpenLog: () -> Unit,
@@ -246,6 +262,15 @@ private fun StatusBar(
                 )
                 Spacer(Modifier.width(12.dp))
                 Text("$sessionCount this session", fontSize = 13.sp, color = Color.White)
+                if (zoomRatio > 1.01f || tracking) {
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        text = "${"%.1f".format(zoomRatio)}\u00d7" + if (tracking) " \u25cf" else "",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (tracking) MaterialTheme.colorScheme.secondary else Color.White,
+                    )
+                }
                 Spacer(Modifier.weight(1f))
                 Icon(
                     imageVector = if (hasFix) Icons.Default.LocationOn else Icons.Default.LocationOff,
@@ -300,7 +325,9 @@ private fun WatchlistBanner(plate: String, onDismiss: () -> Unit, modifier: Modi
 private fun ControlPanel(
     running: Boolean,
     recent: List<LoggedPlate>,
-    zoom: Float,
+    autoZoom: Boolean,
+    zoomRatio: Float,
+    maxZoom: Float,
     onZoomChange: (Float) -> Unit,
     onToggleRunning: () -> Unit,
     onOpenSighting: (Long) -> Unit,
@@ -321,13 +348,23 @@ private fun ControlPanel(
                 Spacer(Modifier.height(10.dp))
             }
 
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Zoom", fontSize = 12.sp, color = Color.White)
-                Slider(
-                    value = zoom,
-                    onValueChange = onZoomChange,
-                    modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
+            if (autoZoom) {
+                Text(
+                    "Auto zoom \u2014 following plates up to ${"%.1f".format(maxZoom)}\u00d7",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 8.dp),
                 )
+            } else {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Zoom ${"%.1f".format(zoomRatio)}\u00d7", fontSize = 12.sp, color = Color.White)
+                    Slider(
+                        value = zoomRatio.coerceIn(1f, maxZoom),
+                        onValueChange = onZoomChange,
+                        valueRange = 1f..maxZoom.coerceAtLeast(1.01f),
+                        modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
+                    )
+                }
             }
 
             Button(

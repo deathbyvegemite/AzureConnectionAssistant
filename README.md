@@ -60,6 +60,59 @@ a finding — poor light shifts colour badly.
 `TabColorCycle.candidateYears()` returns a *list* of years and there is deliberately no
 function anywhere that turns a colour into one year. The API shape is the documentation.
 
+### Getting the best image of the plate
+
+Written for a Galaxy S25 Ultra, though nothing here is Samsung-specific.
+
+The obvious rule — see a plate, zoom in on it — is wrong more often than right from a
+moving car, for reasons that have nothing to do with the camera:
+
+- **Zoom is about the frame centre, and the mount cannot pan.** A plate off to one
+  side is pushed *out* of the frame by zooming, not brought closer. The most zoom that
+  keeps a plate at offset *d* from centre in frame is `(0.5 − margin) / d`. The zoom
+  policy never exceeds it.
+- **The car keeps moving while the lens reacts.** A zoom takes a few hundred
+  milliseconds to land. The keep-in-frame test is run against where the plate *will*
+  be, from its measured velocity, not where it was.
+- **Cross traffic is gone before the zoom lands**, and apparent lateral speed scales
+  with zoom. A plate crossing the frame is zoomed only as far as keeps its apparent
+  speed under a threshold — usually not at all.
+- **Being zoomed in on nothing is the expensive state.** Every other car in the frame
+  is lost. So zooming in is rate-limited and needs two agreeing frames, while zooming
+  out is immediate and happens the moment a plate is gone.
+
+The tracker does its arithmetic in 1× equivalent units — every offset and size
+divided by the current zoom — so that a zoom change alone produces zero apparent
+motion. Without that, zooming in would look exactly like the car lunging at you and
+the policy would chase its own tail.
+
+What actually moves the needle, roughly in order:
+
+1. **Metering on the plate.** Plates are retro-reflective. Under headlights the plate
+   is the brightest thing in the frame and default metering turns it into a white slab.
+   Pointing exposure and focus at the plate box exposes for the characters. This is
+   the biggest win and it costs nothing.
+2. **Analysis resolution.** Glyphs are small. 1080p reads noticeably further than
+   720p, and a Galaxy S25 Ultra runs it without complaint. 4K is offered; it is
+   hotter and gains less than you would hope.
+3. **Zoom, within the rules above.** The default ceiling is 2.5×, and that number is
+   the S25 Ultra talking: up to about 3× the phone serves a crop from the
+   200-megapixel main sensor, which is sharp and changes nothing else. Past that it
+   switches to the telephoto lens, which refocuses and re-exposes — a few hundred
+   milliseconds of unreadable frames at exactly the moment the plate is closest.
+4. **A full-resolution still for the evidence photo.** The live analysis frame is
+   ~1080p; when a plate is confirmed, the app also takes a ~9-megapixel still and
+   crops the plate out of *that*. Several times the pixels across the plate — the
+   difference between "probably a 7" and a 7. Only the region is decoded, so it
+   costs a few hundred kilobytes, not fifty megabytes.
+
+All of it is in Settings under *Camera*, with the reasoning next to each switch.
+
+**One thing to check in the field:** the metering point is mapped from the upright
+frame the recogniser sees onto the sensor the camera addresses. If the focus box in
+the preview lands on the plate, the mapping is right. If it lands on the sky,
+`FrameGeometry.uprightToSensor` is the first place to look.
+
 ### Why make and model are not automatic
 
 There is no free, on-device model that reads make and model off a phone camera with
@@ -83,7 +136,7 @@ CameraX frame  ──►  ML Kit text recognition  ──►  PlateTextParser  �
     to N fps)                                                             dedup)                 crops)
 ```
 
-Three ideas do most of the work:
+Four ideas do most of the work:
 
 **Mask-driven OCR repair.** A recogniser cannot tell a letter `O` from a digit `0` —
 on a plate they are often the same glyph. But if you know the region's layouts, you
@@ -102,8 +155,13 @@ streets away twenty minutes later is a *second* sighting — for a patrol log, t
 repeat is the entire point. Same plate, close in both time and distance, tops up the
 existing entry instead.
 
+**Steering the camera, not just reading from it.** A detected plate is tracked
+across frames, and the app points the camera's focus and exposure at it and zooms
+towards it when — and only when — that would help. See *Getting the best image of
+the plate* below for why "see a plate, zoom in" is the wrong rule and what replaces it.
+
 The whole of that logic lives in `:core`, a plain Kotlin module with no Android
-dependencies, covered by 77 unit tests. Run them on a laptop in seconds:
+dependencies, covered by 106 unit tests. Run them on a laptop in seconds:
 
 ```bash
 ./gradlew :core:test
@@ -180,6 +238,8 @@ Everything below is in Settings, and takes effect immediately.
 | Personalised plates being missed | Switch region to **Generic** — catches far more, at the cost of more false positives |
 | One car logged over and over | Raise the **same-encounter window** and **radius** |
 | Tab date never populated | Expected at speed — tabs only read close up. Nothing to tune |
+| Zoom hunting or flapping | Lower **maximum automatic zoom**; the phone may switch lenses below the default |
+| Plates washing out at night | Turn on **meter on the plate** if off; try **exposure bias** at −2 |
 
 ---
 
@@ -220,6 +280,7 @@ core/                       Pure Kotlin. No Android. Fully unit tested.
   sighting/                 Multi-frame consensus, dedup, geo maths
   color/                    Body colour estimation from a pixel patch
   tab/                      Registration tab: text parsing, expiry, colour cross-check
+  tracking/                 Plate tracker, zoom and metering policies, frame geometry
   export/                   CSV and JSON writers (locale-safe)
 
 app/
