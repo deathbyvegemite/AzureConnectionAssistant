@@ -67,6 +67,9 @@ interface SightingDao {
     )
     suspend fun reinforce(id: Long, lastSeenEpochMs: Long, readCount: Int, confidence: Float)
 
+    @Query("UPDATE sightings SET plateImagePath = :plate, vehicleImagePath = :vehicle WHERE id = :id")
+    suspend fun setCropPaths(id: Long, plate: String?, vehicle: String?)
+
     @Query("UPDATE sightings SET address = :address WHERE id = :id")
     suspend fun setAddress(id: Long, address: String?)
 

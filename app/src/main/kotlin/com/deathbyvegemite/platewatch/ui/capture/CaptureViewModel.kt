@@ -7,6 +7,8 @@ import androidx.lifecycle.viewModelScope
 import com.deathbyvegemite.platewatch.PlateWatchApp
 import com.deathbyvegemite.platewatch.capture.Alerts
 import com.deathbyvegemite.platewatch.capture.AnalyzerConfig
+import com.deathbyvegemite.platewatch.capture.CameraControls
+import com.deathbyvegemite.platewatch.capture.HiResCropper
 import com.deathbyvegemite.platewatch.capture.PlateFrameResult
 import com.deathbyvegemite.platewatch.core.plate.PlateRegions
 import com.deathbyvegemite.platewatch.core.plate.PlateTextParser
@@ -17,16 +19,29 @@ import com.deathbyvegemite.platewatch.core.tab.TabColorCycle
 import com.deathbyvegemite.platewatch.core.tab.TabExpiry
 import com.deathbyvegemite.platewatch.core.tab.TabStatus
 import com.deathbyvegemite.platewatch.core.tab.TabTextParser
+import com.deathbyvegemite.platewatch.core.tracking.CropGeometry
+import com.deathbyvegemite.platewatch.core.tracking.MeteringDecision
+import com.deathbyvegemite.platewatch.core.tracking.MeteringPolicy
+import com.deathbyvegemite.platewatch.core.tracking.NormalizedBox
+import com.deathbyvegemite.platewatch.core.tracking.PlateObservation
+import com.deathbyvegemite.platewatch.core.tracking.PlateTracker
+import com.deathbyvegemite.platewatch.core.tracking.ZoomPolicy
+import com.deathbyvegemite.platewatch.core.tracking.ZoomPolicyConfig
 import com.deathbyvegemite.platewatch.data.db.SightingEntity
 import com.deathbyvegemite.platewatch.data.prefs.CaptureSettings
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import kotlin.math.abs
 
 /** One plate this session put into the log, for the live strip on the capture screen. */
 data class LoggedPlate(
@@ -48,6 +63,10 @@ data class CaptureUiState(
     val hasLocationFix: Boolean = false,
     val locationAccuracyMeters: Float? = null,
     val watchlistAlert: String? = null,
+    /** The zoom the camera is at right now, whoever set it. */
+    val zoomRatio: Float = 1f,
+    /** True while a plate is being followed. */
+    val tracking: Boolean = false,
 )
 
 /**
@@ -56,6 +75,11 @@ data class CaptureUiState(
  * Every frame result is funnelled through a single channel and consumed by one
  * coroutine, so the aggregator is only ever touched from one place and a confirmed
  * plate's database id is always attached before the next frame can reinforce it.
+ *
+ * It also runs the camera-steering loop. Observations from the analyser update a
+ * tracker; the zoom and metering policies read the track and the resulting requests
+ * go to the camera through [CameraControls]. A 250 ms ticker runs the same policies
+ * when no frames are arriving, which is what releases the zoom once a plate is gone.
  */
 class CaptureViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -69,6 +93,10 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
     /** Dropping the oldest frame is right: a stale frame is worth less than a fresh one. */
     private val frames = Channel<PlateFrameResult>(capacity = 32, onBufferOverflow = BufferOverflow.DROP_OLDEST)
 
+    /** Second, lighter stream: every plausible plate box, for steering the camera. */
+    private val observations =
+        Channel<Pair<PlateObservation, Int>>(capacity = 8, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+
     @Volatile
     private var settings = CaptureSettings()
 
@@ -78,16 +106,29 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
     private var aggregator = SightingAggregator(settings.toAggregatorConfig())
     private var watchlist: Set<String> = emptySet()
 
+    private val tracker = PlateTracker()
+    private var zoomPolicy = ZoomPolicy(ZoomPolicyConfig(maxZoom = settings.maxAutoZoom))
+    private val meteringPolicy = MeteringPolicy()
+    private var controls: CameraControls? = null
+    private var tickerJob: Job? = null
+
+    @Volatile
+    private var currentZoom = 1f
+    private var lastRotationDegrees = 0
+
     init {
         viewModelScope.launch {
             container.settingsStore.settings.collect { next ->
                 val regionChanged = next.regionId != settings.regionId
                 val tuningChanged = next.toAggregatorConfig() != settings.toAggregatorConfig()
+                val zoomChanged = next.maxAutoZoom != settings.maxAutoZoom
+                val evChanged = next.exposureBias != settings.exposureBias
                 settings = next
                 if (regionChanged) parser = PlateTextParser(PlateRegions.byId(next.regionId))
-                if (regionChanged || tuningChanged) {
-                    aggregator = SightingAggregator(next.toAggregatorConfig())
-                }
+                if (regionChanged || tuningChanged) aggregator = SightingAggregator(next.toAggregatorConfig())
+                if (zoomChanged) zoomPolicy = ZoomPolicy(ZoomPolicyConfig(maxZoom = next.maxAutoZoom))
+                if (evChanged) controls?.setExposureCompensation(next.exposureBias)
+                if (!next.autoZoom && currentZoom != 1f) onManualZoom(1f)
                 _uiState.update { it.copy(settings = next) }
             }
         }
@@ -105,6 +146,7 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
             }
         }
         viewModelScope.launch { consumeFrames() }
+        viewModelScope.launch { consumeObservations() }
     }
 
     /** Supplies the analyser with current settings; called once per frame. */
@@ -114,6 +156,7 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
         minFrameScore = settings.minFrameScore,
         wantCrops = settings.savePhotos,
         tabParser = if (settings.readTabs) TabTextParser(LocalDate.now().year) else null,
+        zoomRatio = currentZoom,
     )
 
     /** Called from the camera analysis thread. Must not block. */
@@ -121,18 +164,99 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
         frames.trySend(result)
     }
 
+    /** Called from the camera analysis thread for every plausible plate box. */
+    fun onObservation(observation: PlateObservation, rotationDegrees: Int) {
+        observations.trySend(observation to rotationDegrees)
+    }
+
+    /** The screen hands over the bound camera; `null` when it is unbound. */
+    fun attachControls(newControls: CameraControls?) {
+        controls = newControls
+        newControls?.let {
+            it.setExposureCompensation(settings.exposureBias)
+            it.setZoomRatio(1f)
+        }
+        currentZoom = 1f
+        _uiState.update { it.copy(zoomRatio = 1f, tracking = false) }
+    }
+
+    /** Manual zoom from the slider, used when automatic zoom is switched off. */
+    fun onManualZoom(ratio: Float) {
+        val c = controls ?: return
+        val clamped = ratio.coerceIn(1f, c.maxZoomRatio.coerceAtLeast(1f))
+        c.setZoomRatio(clamped)
+        currentZoom = clamped
+        _uiState.update { it.copy(zoomRatio = clamped) }
+    }
+
     fun onCaptureStarted() {
         container.locationTracker.start()
         _uiState.update { it.copy(running = true, sessionCount = 0, recent = emptyList()) }
+        tickerJob?.cancel()
+        tickerJob = viewModelScope.launch {
+            while (isActive) {
+                delay(TICK_MS)
+                applyPolicies(System.currentTimeMillis())
+            }
+        }
     }
 
     fun onCaptureStopped() {
+        tickerJob?.cancel()
+        tickerJob = null
         container.locationTracker.stop()
         aggregator.reset()
-        _uiState.update { it.copy(running = false, pendingPlates = emptyList()) }
+        tracker.reset()
+        meteringPolicy.reset()
+        controls?.cancelMetering()
+        controls?.setZoomRatio(1f)
+        currentZoom = 1f
+        _uiState.update { it.copy(running = false, pendingPlates = emptyList(), zoomRatio = 1f, tracking = false) }
     }
 
     fun dismissWatchlistAlert() = _uiState.update { it.copy(watchlistAlert = null) }
+
+    private suspend fun consumeObservations() {
+        for ((observation, rotation) in observations) {
+            tracker.observe(observation)
+            lastRotationDegrees = rotation
+            applyPolicies(observation.timestampMs)
+        }
+    }
+
+    /**
+     * One pass of the steering loop. Runs on the main dispatcher from both the
+     * observation consumer and the ticker, so the tracker and policies are only ever
+     * touched from one thread.
+     */
+    private fun applyPolicies(nowMs: Long) {
+        val c = controls ?: return
+        if (!_uiState.value.running) return
+        val track = tracker.current(nowMs, RELEASE_AFTER_MS)
+
+        if (settings.autoZoom) {
+            val target = zoomPolicy.decide(track, currentZoom)
+                .coerceIn(1f, c.maxZoomRatio.coerceAtLeast(1f))
+            if (abs(target - currentZoom) > 1e-3f) {
+                c.setZoomRatio(target)
+                currentZoom = target
+            }
+        }
+
+        if (settings.plateMetering) {
+            when (val decision = meteringPolicy.decide(track, currentZoom, nowMs)) {
+                is MeteringDecision.Meter -> c.meterAt(decision.x, decision.y, lastRotationDegrees)
+                MeteringDecision.Cancel -> c.cancelMetering()
+                MeteringDecision.Hold -> Unit
+            }
+        }
+
+        val tracking = track != null
+        val state = _uiState.value
+        if (state.zoomRatio != currentZoom || state.tracking != tracking) {
+            _uiState.update { it.copy(zoomRatio = currentZoom, tracking = tracking) }
+        }
+    }
 
     private suspend fun consumeFrames() {
         for (frame in frames) {
@@ -270,15 +394,52 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
                     ?.let { repository.setAddress(id, it) }
             }
         }
+
+        if (settings.hiResStills && settings.savePhotos) {
+            frame.plateBox?.let { box -> captureHiResCrops(id, stamp, box) }
+        }
+    }
+
+    /**
+     * The live frame that confirmed a plate is a 1080p-ish analysis frame. A full
+     * resolution still taken a moment later gives a crop with several times the
+     * pixels across the plate — the difference between "probably a 7" and a 7.
+     *
+     * The car keeps moving between the two, so the plate box is padded generously
+     * before it is applied to the still.
+     */
+    private fun captureHiResCrops(id: Long, stamp: String, box: NormalizedBox) {
+        val c = controls ?: return
+        c.captureStill { still ->
+            if (still == null) return@captureStill
+            viewModelScope.launch(Dispatchers.Default) {
+                val plate = HiResCropper.crop(still, CropGeometry.plate(box, padding = HI_RES_PLATE_PADDING))
+                val vehicle = HiResCropper.crop(still, CropGeometry.vehicle(box))
+                val platePath = plate?.let { container.photos.save(it, "${stamp}_plate_hires", quality = 92) }
+                val vehiclePath = vehicle?.let { container.photos.save(it, "${stamp}_vehicle_hires", quality = 88) }
+                plate?.recycle()
+                vehicle?.recycle()
+                if (platePath != null || vehiclePath != null) {
+                    repository.replaceCrops(id, platePath, vehiclePath)
+                }
+            }
+        }
     }
 
     override fun onCleared() {
         super.onCleared()
+        tickerJob?.cancel()
         container.locationTracker.stop()
         frames.close()
+        observations.close()
     }
 
     private companion object {
         const val MAX_RECENT = 8
+        const val TICK_MS = 250L
+        /** How long after the last sighting the zoom lets go and returns to 1×. */
+        const val RELEASE_AFTER_MS = 500L
+        /** Extra margin on the still crop, for the distance the car covers meanwhile. */
+        const val HI_RES_PLATE_PADDING = 0.4f
     }
 }

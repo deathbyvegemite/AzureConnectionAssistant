@@ -42,6 +42,12 @@ class SettingsStore(private val context: Context) {
             alertOnWatchlist = p[Keys.ALERT_WATCHLIST] ?: d.alertOnWatchlist,
             readTabs = p[Keys.READ_TABS] ?: d.readTabs,
             alertOnExpiredTab = p[Keys.ALERT_EXPIRED_TAB] ?: d.alertOnExpiredTab,
+            analysisResolution = p[Keys.ANALYSIS_RESOLUTION] ?: d.analysisResolution,
+            autoZoom = p[Keys.AUTO_ZOOM] ?: d.autoZoom,
+            maxAutoZoom = p[Keys.MAX_AUTO_ZOOM] ?: d.maxAutoZoom,
+            plateMetering = p[Keys.PLATE_METERING] ?: d.plateMetering,
+            exposureBias = p[Keys.EXPOSURE_BIAS] ?: d.exposureBias,
+            hiResStills = p[Keys.HI_RES_STILLS] ?: d.hiResStills,
         )
     }
 
@@ -61,6 +67,12 @@ class SettingsStore(private val context: Context) {
         p[Keys.ALERT_WATCHLIST] = s.alertOnWatchlist
         p[Keys.READ_TABS] = s.readTabs
         p[Keys.ALERT_EXPIRED_TAB] = s.alertOnExpiredTab
+        p[Keys.ANALYSIS_RESOLUTION] = s.analysisResolution
+        p[Keys.AUTO_ZOOM] = s.autoZoom
+        p[Keys.MAX_AUTO_ZOOM] = s.maxAutoZoom
+        p[Keys.PLATE_METERING] = s.plateMetering
+        p[Keys.EXPOSURE_BIAS] = s.exposureBias
+        p[Keys.HI_RES_STILLS] = s.hiResStills
     }
 
     private object Keys {
@@ -79,5 +91,11 @@ class SettingsStore(private val context: Context) {
         val ALERT_WATCHLIST = booleanPreferencesKey("alert_watchlist")
         val READ_TABS = booleanPreferencesKey("read_tabs")
         val ALERT_EXPIRED_TAB = booleanPreferencesKey("alert_expired_tab")
+        val ANALYSIS_RESOLUTION = stringPreferencesKey("analysis_resolution")
+        val AUTO_ZOOM = booleanPreferencesKey("auto_zoom")
+        val MAX_AUTO_ZOOM = floatPreferencesKey("max_auto_zoom")
+        val PLATE_METERING = booleanPreferencesKey("plate_metering")
+        val EXPOSURE_BIAS = intPreferencesKey("exposure_bias")
+        val HI_RES_STILLS = booleanPreferencesKey("hi_res_stills")
     }
 }

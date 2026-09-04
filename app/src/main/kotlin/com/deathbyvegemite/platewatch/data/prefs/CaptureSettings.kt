@@ -32,6 +32,22 @@ data class CaptureSettings(
     val readTabs: Boolean = true,
     /** Alert like a watchlist hit when a tab reads as expired. */
     val alertOnExpiredTab: Boolean = false,
+
+    /** Analysis stream size: "720p", "1080p" or "2160p". */
+    val analysisResolution: String = "1080p",
+    /** Follow a detected plate and zoom towards it when that would help the read. */
+    val autoZoom: Boolean = true,
+    /**
+     * Ceiling for automatic zoom. 2.5× keeps a Galaxy S25 Ultra on its main sensor;
+     * past ~3× it switches lenses, which costs a refocus at the worst moment.
+     */
+    val maxAutoZoom: Float = 2.5f,
+    /** Point focus and exposure at the plate rather than the road. */
+    val plateMetering: Boolean = true,
+    /** Exposure compensation in camera steps; negative tames retro-reflective glare. */
+    val exposureBias: Int = 0,
+    /** Take a full-resolution still when a plate is confirmed and keep that crop. */
+    val hiResStills: Boolean = true,
 ) {
     fun toAggregatorConfig(): AggregatorConfig = AggregatorConfig(
         minConfirmations = minConfirmations.coerceAtLeast(1),

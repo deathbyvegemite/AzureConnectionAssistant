@@ -34,6 +34,22 @@ class SightingRepository(
 
     suspend fun setAddress(id: Long, address: String?) = sightings.setAddress(id, address)
 
+    /**
+     * Swap in better crops — typically from a full-resolution still taken a moment
+     * after the live frame that confirmed the plate. Either may be null to keep the
+     * existing one; replaced files are deleted.
+     */
+    suspend fun replaceCrops(id: Long, platePath: String?, vehiclePath: String?) {
+        val row = sightings.byId(id) ?: return
+        if (platePath != null && platePath != row.plateImagePath) photos.delete(row.plateImagePath)
+        if (vehiclePath != null && vehiclePath != row.vehicleImagePath) photos.delete(row.vehicleImagePath)
+        sightings.setCropPaths(
+            id = id,
+            plate = platePath ?: row.plateImagePath,
+            vehicle = vehiclePath ?: row.vehicleImagePath,
+        )
+    }
+
     suspend fun setFlagged(id: Long, flagged: Boolean) = sightings.setFlagged(id, flagged)
 
     suspend fun setVehicleDetails(

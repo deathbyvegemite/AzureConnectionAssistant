@@ -15,6 +15,9 @@ import com.deathbyvegemite.platewatch.core.plate.PlateTextParser
 import com.deathbyvegemite.platewatch.core.plate.RecognizedLine
 import com.deathbyvegemite.platewatch.core.tab.TabReading
 import com.deathbyvegemite.platewatch.core.tab.TabTextParser
+import com.deathbyvegemite.platewatch.core.tracking.CropGeometry
+import com.deathbyvegemite.platewatch.core.tracking.NormalizedBox
+import com.deathbyvegemite.platewatch.core.tracking.PlateObservation
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.Text
 import com.google.mlkit.vision.text.TextRecognizer
@@ -29,6 +32,13 @@ data class AnalyzerConfig(
     val wantCrops: Boolean,
     /** Null disables registration tab reading entirely. */
     val tabParser: TabTextParser? = null,
+    /** The zoom the camera is at, so the tracker can normalise geometry to 1×. */
+    val zoomRatio: Float = 1f,
+    /**
+     * Weaker than [minFrameScore]: a reading not yet good enough to log is still
+     * worth zooming towards, because zooming is how it becomes good enough.
+     */
+    val trackMinScore: Float = 0.30f,
 )
 
 /** One frame that produced a plausible plate. */
@@ -41,6 +51,8 @@ class PlateFrameResult(
     val tabReading: TabReading? = null,
     /** Tab colour, kept only to corroborate [tabReading] — never to infer a year from. */
     val tabColorName: String? = null,
+    /** Where the plate was, so a high-resolution still can be cropped to it. */
+    val plateBox: NormalizedBox? = null,
 )
 
 /**
@@ -53,12 +65,16 @@ class PlateFrameResult(
  *  - every callback is dispatched onto [callbackExecutor]; ML Kit would otherwise
  *    run them on the main thread and rotating a 720p frame there visibly janks
  *    the preview
+ *
+ * It also feeds the tracker: every frame with a plausible plate, however weak, is
+ * reported through [onObservation] so zoom and metering can be steered towards it.
  */
 class PlateAnalyzer(
     private val recognizer: TextRecognizer,
     private val callbackExecutor: Executor,
     private val config: () -> AnalyzerConfig,
     private val onResult: (PlateFrameResult) -> Unit,
+    private val onObservation: (observation: PlateObservation, rotationDegrees: Int) -> Unit = { _, _ -> },
 ) : ImageAnalysis.Analyzer {
 
     @Volatile
@@ -81,11 +97,12 @@ class PlateAnalyzer(
 
         val rotation = proxy.imageInfo.rotationDegrees
         // ML Kit reports boxes in the *upright* frame, so measure against upright dimensions.
+        val uprightWidth = if (rotation % 180 == 0) proxy.width else proxy.height
         val uprightHeight = if (rotation % 180 == 0) proxy.height else proxy.width
 
         recognizer.process(InputImage.fromMediaImage(mediaImage, rotation))
             .addOnSuccessListener(callbackExecutor) { text ->
-                runCatching { handle(text, proxy, rotation, uprightHeight, settings) }
+                runCatching { handle(text, proxy, rotation, uprightWidth, uprightHeight, settings) }
                     .onFailure { Log.w(TAG, "Frame handling failed", it) }
             }
             .addOnFailureListener(callbackExecutor) { Log.d(TAG, "Recognition failed", it) }
@@ -97,18 +114,31 @@ class PlateAnalyzer(
         text: Text,
         proxy: ImageProxy,
         rotation: Int,
+        uprightWidth: Int,
         uprightHeight: Int,
         settings: AnalyzerConfig,
     ) {
         val match = bestMatch(text, uprightHeight, settings) ?: return
+        val box = match.box
+        val normalized = box?.let {
+            NormalizedBox.fromPixels(it.left, it.top, it.right, it.bottom, uprightWidth, uprightHeight)
+        }
+
+        // Feed the tracker before the logging threshold: a weak, distant read is
+        // exactly the case zoom exists to improve.
+        if (normalized != null && match.candidate.score >= settings.trackMinScore) {
+            onObservation(
+                PlateObservation(System.currentTimeMillis(), normalized, settings.zoomRatio),
+                rotation,
+            )
+        }
+
         if (match.candidate.score < settings.minFrameScore) return
 
         var plateCrop: Bitmap? = null
         var vehicleCrop: Bitmap? = null
         var colorName: String? = null
         var tabColorName: String? = null
-
-        val box = match.box
 
         // The tab's month and year are printed on it as text, and the recogniser has
         // already read every scrap of text in this frame — so this costs nothing.
@@ -118,19 +148,19 @@ class PlateAnalyzer(
             null
         }
 
-        if (box != null) {
+        if (normalized != null) {
             val upright = uprightBitmap(proxy, rotation)
             if (upright != null) {
-                plateCrop = if (settings.wantCrops) crop(upright, expand(box, upright, 0.12f)) else null
-                val vehicleRect = vehicleRect(box, upright)
-                if (vehicleRect != null) {
+                if (settings.wantCrops) plateCrop = crop(upright, CropGeometry.plate(normalized))
+                val vehicleRect = CropGeometry.vehicle(normalized)
+                if (!vehicleRect.isEmpty()) {
                     if (settings.wantCrops) vehicleCrop = crop(upright, vehicleRect)
                     colorName = estimateColor(upright, vehicleRect)
                 }
                 // Sampled only to cross-check a tab we actually read. Colour cannot
                 // yield a year on its own: the cycle repeats every five years.
                 if (tabReading != null) {
-                    tabColorName = estimateColor(upright, tabColorRect(box, upright))
+                    tabColorName = estimateColor(upright, CropGeometry.tab(normalized))
                 }
                 if (upright != plateCrop && upright != vehicleCrop) upright.recycle()
             }
@@ -144,6 +174,7 @@ class PlateAnalyzer(
                 colorName = colorName,
                 tabReading = tabReading,
                 tabColorName = tabColorName,
+                plateBox = normalized,
             ),
         )
     }
@@ -174,17 +205,6 @@ class PlateAnalyzer(
         }
         return lines
     }
-
-    /**
-     * Where Washington puts the tab: the upper right corner of the rear plate, which
-     * sits above and slightly right of the character row.
-     */
-    private fun tabColorRect(plate: Rect, within: Bitmap): Rect = Rect(
-        plate.right - (plate.width() * 0.10f).roundToInt(),
-        plate.top - (plate.height() * 0.90f).roundToInt(),
-        plate.right + (plate.width() * 0.28f).roundToInt(),
-        plate.top + (plate.height() * 0.15f).roundToInt(),
-    ).clampTo(within)
 
     private class Match(val candidate: PlateCandidate, val box: Rect?)
 
@@ -237,38 +257,24 @@ class PlateAnalyzer(
         null
     }
 
-    private fun expand(box: Rect, within: Bitmap, fraction: Float): Rect {
-        val dx = (box.width() * fraction).roundToInt()
-        val dy = (box.height() * fraction).roundToInt()
-        return Rect(box.left - dx, box.top - dy, box.right + dx, box.bottom + dy).clampTo(within)
-    }
+    private fun NormalizedBox.toPixels(bitmap: Bitmap): Rect = Rect(
+        (left * bitmap.width).roundToInt().coerceIn(0, bitmap.width),
+        (top * bitmap.height).roundToInt().coerceIn(0, bitmap.height),
+        (right * bitmap.width).roundToInt().coerceIn(0, bitmap.width),
+        (bottom * bitmap.height).roundToInt().coerceIn(0, bitmap.height),
+    )
 
-    /**
-     * The bodywork sits directly above the plate. Sampling there gives a usable
-     * colour on the great majority of cars, and a wide enough crop to recognise the
-     * vehicle by eye later.
-     */
-    private fun vehicleRect(plate: Rect, within: Bitmap): Rect? {
-        val centerX = plate.centerX()
-        val halfWidth = (plate.width() * VEHICLE_WIDTH_FACTOR / 2f).roundToInt()
-        val rect = Rect(
-            centerX - halfWidth,
-            plate.top - (plate.height() * VEHICLE_TOP_FACTOR).roundToInt(),
-            centerX + halfWidth,
-            plate.top - (plate.height() * VEHICLE_BOTTOM_FACTOR).roundToInt(),
-        ).clampTo(within)
-        return if (rect.width() < MIN_CROP_PX || rect.height() < MIN_CROP_PX) null else rect
-    }
-
-    private fun crop(source: Bitmap, rect: Rect): Bitmap? = try {
+    private fun crop(source: Bitmap, region: NormalizedBox): Bitmap? = try {
+        val rect = region.toPixels(source)
         if (rect.width() < MIN_CROP_PX || rect.height() < MIN_CROP_PX) null
         else Bitmap.createBitmap(source, rect.left, rect.top, rect.width(), rect.height())
     } catch (e: Exception) {
-        Log.w(TAG, "Crop $rect failed", e)
+        Log.w(TAG, "Crop $region failed", e)
         null
     }
 
-    private fun estimateColor(source: Bitmap, rect: Rect): String? {
+    private fun estimateColor(source: Bitmap, region: NormalizedBox): String? {
+        val rect = region.toPixels(source)
         val width = rect.width()
         val height = rect.height()
         if (width < MIN_CROP_PX || height < MIN_CROP_PX) return null
@@ -284,21 +290,11 @@ class PlateAnalyzer(
         }
     }
 
-    private fun Rect.clampTo(bitmap: Bitmap) = Rect(
-        left.coerceIn(0, bitmap.width),
-        top.coerceIn(0, bitmap.height),
-        right.coerceIn(0, bitmap.width),
-        bottom.coerceIn(0, bitmap.height),
-    )
-
     private companion object {
         const val TAG = "PlateAnalyzer"
         const val FALLBACK_CONFIDENCE = 0.5f
         /** A plate this tall relative to the frame is about as good as it gets. */
         const val IDEAL_TEXT_HEIGHT_FRACTION = 0.07f
-        const val VEHICLE_WIDTH_FACTOR = 2.2f
-        const val VEHICLE_TOP_FACTOR = 2.0f
-        const val VEHICLE_BOTTOM_FACTOR = 0.35f
         const val MIN_CROP_PX = 8
         const val TAB_SEARCH_SIDE_FACTOR = 0.45f
         const val TAB_SEARCH_ABOVE_FACTOR = 1.30f
