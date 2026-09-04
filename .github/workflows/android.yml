@@ -1,0 +1,72 @@
+# Builds the app and publishes the debug APK.
+#
+# Beyond checking the build, this is how the app is distributed: every run
+# uploads an installable APK, so anyone in the group can sideload it without
+# installing an Android toolchain.
+
+name: Android
+
+on:
+  push:
+    # Branch pushes are covered by the pull_request trigger below; without this
+    # restriction every push to a PR branch builds twice.
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A new push supersedes an in-flight run for the same ref.
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Test and assemble
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Set up the Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install the SDK packages this build needs
+        run: sdkmanager --install "platforms;android-35" "build-tools;35.0.0"
+
+      # Runs first: seconds, no Android SDK needed, and it covers the plate
+      # parsing, tab reading, consensus and export logic.
+      - name: Unit test the pure-Kotlin core
+        run: ./gradlew :core:test --no-daemon --stacktrace
+
+      - name: Assemble the debug APK
+        run: ./gradlew :app:assembleDebug --no-daemon --stacktrace
+
+      - name: Upload the debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: platewatch-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: platewatch-test-reports
+          path: |
+            core/build/reports/tests/
+            core/build/test-results/
+          if-no-files-found: ignore
+          retention-days: 7
