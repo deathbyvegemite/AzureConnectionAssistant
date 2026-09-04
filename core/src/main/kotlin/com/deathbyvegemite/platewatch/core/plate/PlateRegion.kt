@@ -101,5 +101,5 @@ object PlateRegions {
 
     val all: List<PlateRegion> = listOf(AU, NZ, US, UK, GENERIC)
 
-    fun byId(id: String?): PlateRegion = all.firstOrNull { it.id == id } ?: AU
+    fun byId(id: String?): PlateRegion = all.firstOrNull { it.id == id } ?: US
 }

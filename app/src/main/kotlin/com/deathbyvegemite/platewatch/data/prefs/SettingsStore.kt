@@ -40,6 +40,8 @@ class SettingsStore(private val context: Context) {
             keepScreenOn = p[Keys.KEEP_SCREEN_ON] ?: d.keepScreenOn,
             resolveAddresses = p[Keys.RESOLVE_ADDRESSES] ?: d.resolveAddresses,
             alertOnWatchlist = p[Keys.ALERT_WATCHLIST] ?: d.alertOnWatchlist,
+            readTabs = p[Keys.READ_TABS] ?: d.readTabs,
+            alertOnExpiredTab = p[Keys.ALERT_EXPIRED_TAB] ?: d.alertOnExpiredTab,
         )
     }
 
@@ -57,6 +59,8 @@ class SettingsStore(private val context: Context) {
         p[Keys.KEEP_SCREEN_ON] = s.keepScreenOn
         p[Keys.RESOLVE_ADDRESSES] = s.resolveAddresses
         p[Keys.ALERT_WATCHLIST] = s.alertOnWatchlist
+        p[Keys.READ_TABS] = s.readTabs
+        p[Keys.ALERT_EXPIRED_TAB] = s.alertOnExpiredTab
     }
 
     private object Keys {
@@ -73,5 +77,7 @@ class SettingsStore(private val context: Context) {
         val KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on")
         val RESOLVE_ADDRESSES = booleanPreferencesKey("resolve_addresses")
         val ALERT_WATCHLIST = booleanPreferencesKey("alert_watchlist")
+        val READ_TABS = booleanPreferencesKey("read_tabs")
+        val ALERT_EXPIRED_TAB = booleanPreferencesKey("alert_expired_tab")
     }
 }

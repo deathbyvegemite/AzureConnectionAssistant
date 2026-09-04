@@ -22,6 +22,43 @@ confidence than they deserve:
 | **Street address** | Reverse geocoded from the fix | Usually right to the street, often not to the house number |
 | **Colour** | Median of the pixels just above the plate | An estimate. Useful as a filter, not as evidence |
 | **Make / model** | **Typed in by you**, on the sighting screen | Always right, because a human did it |
+| **Registration tab** | The expiry month and year read as **printed text**, not inferred from tab colour | Only legible at close range — in a queue, or parked. Blank the rest of the time, which is the correct answer |
+
+### Why the tab date is read, not guessed from the colour
+
+Washington tabs are colour-coded by year, and it is tempting to sample that colour and
+call it a year when the tab is too small to read. That cannot work, and not for a
+reason a better camera would fix:
+
+| Year | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 | 2027 |
+|------|------|------|------|------|------|------|------|------|
+| Tab  | white | blue | red | green | black | white | blue | red |
+
+The cycle is five long and then repeats, so **blue means 2021 or 2026 or 2031** — a
+colour identifies a year modulo five, and nothing narrower. The month, which is printed
+on the same tab, is not encoded in the colour at all, so no colour sampling will ever
+produce one. And two of the five colours are white and black: the two that survive
+worst through a moving camera, on a plate that has a white background for a white tab
+to vanish into.
+
+There is also no useful distance band where the idea would pay off. At 720p with the
+plate characters filling the frame height the app is tuned for, the tab is around 30 px
+wide — close to legible. Back off until the plate itself stops reading and the tab is
+about 6 px of luma and, after the 4:2:0 chroma subsampling every camera pipeline
+applies, roughly **three by five colour samples**, smeared with the white plate around
+it. The window where "too far to read, close enough to colour-match" exists is not a
+window at all.
+
+So the app reads the month and year **as text**, from the same recognition pass that is
+already running over the whole frame — which costs nothing extra — and reports nothing
+when the tab is not legible. Colour is sampled for exactly one purpose: checking it
+against a year that was actually read. A tab printed 2023 that samples as blue is
+flagged, because [recolouring an expired tab](https://www.king5.com/article/news/nation-world/expired-license-plate-tab-colored-to-look-2019/507-ea9435b1-b2e4-4ec0-9d5f-c88853810fa7)
+is a cheap and well-documented forgery. That flag is a prompt to look at the crop, not
+a finding — poor light shifts colour badly.
+
+`TabColorCycle.candidateYears()` returns a *list* of years and there is deliberately no
+function anywhere that turns a colour into one year. The API shape is the documentation.
 
 ### Why make and model are not automatic
 
@@ -66,7 +103,7 @@ repeat is the entire point. Same plate, close in both time and distance, tops up
 existing entry instead.
 
 The whole of that logic lives in `:core`, a plain Kotlin module with no Android
-dependencies, covered by 44 unit tests. Run them on a laptop in seconds:
+dependencies, covered by 77 unit tests. Run them on a laptop in seconds:
 
 ```bash
 ./gradlew :core:test
@@ -110,7 +147,8 @@ recognition model is bundled into the APK, and location comes from the platform
 1. Mount the phone where the rear camera has a clear forward view. A windscreen mount
    at roughly eye height works best; the app reads plates head-on far better than at
    an angle.
-2. Open Settings, set **Plate formats** to your region (defaults to Australia).
+2. Open Settings, set **Plate formats** to your region. Defaults to **United States /
+   Canada**, which covers Washington's `ABC1234` passenger format.
 3. Tap **Start logging**. The screen stays on and dims to a dark UI.
 4. Drive. A short tick means a plate went into the log; a longer alternating alert
    means a watchlist plate just went past.
@@ -132,6 +170,7 @@ Everything below is in Settings, and takes effect immediately.
 | Phone getting hot, battery dying | Drop **frames analysed per second** to 2–3, turn off **save crops** |
 | Personalised plates being missed | Switch region to **Generic** — catches far more, at the cost of more false positives |
 | One car logged over and over | Raise the **same-encounter window** and **radius** |
+| Tab date never populated | Expected at speed — tabs only read close up. Nothing to tune |
 
 ---
 
@@ -171,6 +210,7 @@ core/                       Pure Kotlin. No Android. Fully unit tested.
   plate/                    Mask-driven formats, OCR character repair, parser
   sighting/                 Multi-frame consensus, dedup, geo maths
   color/                    Body colour estimation from a pixel patch
+  tab/                      Registration tab: text parsing, expiry, colour cross-check
   export/                   CSV and JSON writers (locale-safe)
 
 app/
@@ -188,6 +228,12 @@ app/
 - Night-time accuracy is poor without street lighting. The torch helps at a standstill
   and not at all at speed.
 - Motorbike plates, and plates on a steep angle, are largely missed.
+- Registration tabs are usually unreadable from a moving car. The field stays blank
+  rather than being filled with a guess, and that is the intended behaviour.
+- Tab reading assumes the month and year are printed on a single tab on the rear plate,
+  per [WAC 308-96A-295](https://app.leg.wa.gov/wac/default.aspx?cite=308-96A-295). The
+  parser accepts several renderings (`SEP 26`, `SEP2026`, `09 2026`) rather than
+  betting on one layout, but a redesigned tab could still need a new pattern.
 - Personalised and novelty plates match no standard layout — use Generic.
 - Two lanes of traffic at once will lose plates; the analyser commits to the best
   candidate per frame.

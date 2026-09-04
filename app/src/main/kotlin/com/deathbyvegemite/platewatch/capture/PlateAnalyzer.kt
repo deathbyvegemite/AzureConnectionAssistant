@@ -13,6 +13,8 @@ import com.deathbyvegemite.platewatch.core.color.VehicleColor
 import com.deathbyvegemite.platewatch.core.plate.PlateCandidate
 import com.deathbyvegemite.platewatch.core.plate.PlateTextParser
 import com.deathbyvegemite.platewatch.core.plate.RecognizedLine
+import com.deathbyvegemite.platewatch.core.tab.TabReading
+import com.deathbyvegemite.platewatch.core.tab.TabTextParser
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.Text
 import com.google.mlkit.vision.text.TextRecognizer
@@ -25,6 +27,8 @@ data class AnalyzerConfig(
     val frameIntervalMs: Long,
     val minFrameScore: Float,
     val wantCrops: Boolean,
+    /** Null disables registration tab reading entirely. */
+    val tabParser: TabTextParser? = null,
 )
 
 /** One frame that produced a plausible plate. */
@@ -33,6 +37,10 @@ class PlateFrameResult(
     val plateCrop: Bitmap?,
     val vehicleCrop: Bitmap?,
     val colorName: String?,
+    /** Month and year read off the registration tab as text, when legible. */
+    val tabReading: TabReading? = null,
+    /** Tab colour, kept only to corroborate [tabReading] — never to infer a year from. */
+    val tabColorName: String? = null,
 )
 
 /**
@@ -98,8 +106,18 @@ class PlateAnalyzer(
         var plateCrop: Bitmap? = null
         var vehicleCrop: Bitmap? = null
         var colorName: String? = null
+        var tabColorName: String? = null
 
         val box = match.box
+
+        // The tab's month and year are printed on it as text, and the recogniser has
+        // already read every scrap of text in this frame — so this costs nothing.
+        val tabReading = if (box != null && settings.tabParser != null) {
+            settings.tabParser.parse(tabCandidateLines(text, box))
+        } else {
+            null
+        }
+
         if (box != null) {
             val upright = uprightBitmap(proxy, rotation)
             if (upright != null) {
@@ -109,12 +127,64 @@ class PlateAnalyzer(
                     if (settings.wantCrops) vehicleCrop = crop(upright, vehicleRect)
                     colorName = estimateColor(upright, vehicleRect)
                 }
+                // Sampled only to cross-check a tab we actually read. Colour cannot
+                // yield a year on its own: the cycle repeats every five years.
+                if (tabReading != null) {
+                    tabColorName = estimateColor(upright, tabColorRect(box, upright))
+                }
                 if (upright != plateCrop && upright != vehicleCrop) upright.recycle()
             }
         }
 
-        onResult(PlateFrameResult(match.candidate, plateCrop, vehicleCrop, colorName))
+        onResult(
+            PlateFrameResult(
+                candidate = match.candidate,
+                plateCrop = plateCrop,
+                vehicleCrop = vehicleCrop,
+                colorName = colorName,
+                tabReading = tabReading,
+                tabColorName = tabColorName,
+            ),
+        )
     }
+
+    /**
+     * Text near the plate, excluding the plate itself.
+     *
+     * Bounded to the plate's neighbourhood so a date on a bumper sticker or a dealer
+     * frame further up the car cannot be mistaken for a tab, but generously so — the
+     * exact tab position varies by plate design and the box we have is around the
+     * *characters*, not the physical plate.
+     */
+    private fun tabCandidateLines(text: Text, plate: Rect): List<RecognizedLine> {
+        val region = Rect(
+            plate.left - (plate.width() * TAB_SEARCH_SIDE_FACTOR).roundToInt(),
+            plate.top - (plate.height() * TAB_SEARCH_ABOVE_FACTOR).roundToInt(),
+            plate.right + (plate.width() * TAB_SEARCH_SIDE_FACTOR).roundToInt(),
+            plate.bottom + (plate.height() * TAB_SEARCH_BELOW_FACTOR).roundToInt(),
+        )
+        val lines = ArrayList<RecognizedLine>()
+        for (block in text.textBlocks) {
+            for (line in block.lines) {
+                val lineBox = line.boundingBox ?: continue
+                if (lineBox == plate) continue
+                if (!Rect.intersects(region, lineBox)) continue
+                lines += RecognizedLine(line.text, 0.6f)
+            }
+        }
+        return lines
+    }
+
+    /**
+     * Where Washington puts the tab: the upper right corner of the rear plate, which
+     * sits above and slightly right of the character row.
+     */
+    private fun tabColorRect(plate: Rect, within: Bitmap): Rect = Rect(
+        plate.right - (plate.width() * 0.10f).roundToInt(),
+        plate.top - (plate.height() * 0.90f).roundToInt(),
+        plate.right + (plate.width() * 0.28f).roundToInt(),
+        plate.top + (plate.height() * 0.15f).roundToInt(),
+    ).clampTo(within)
 
     private class Match(val candidate: PlateCandidate, val box: Rect?)
 
@@ -230,5 +300,8 @@ class PlateAnalyzer(
         const val VEHICLE_TOP_FACTOR = 2.0f
         const val VEHICLE_BOTTOM_FACTOR = 0.35f
         const val MIN_CROP_PX = 8
+        const val TAB_SEARCH_SIDE_FACTOR = 0.45f
+        const val TAB_SEARCH_ABOVE_FACTOR = 1.30f
+        const val TAB_SEARCH_BELOW_FACTOR = 0.40f
     }
 }

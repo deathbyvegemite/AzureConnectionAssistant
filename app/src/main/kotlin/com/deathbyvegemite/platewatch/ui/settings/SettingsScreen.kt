@@ -124,6 +124,23 @@ fun SettingsScreen(onBack: () -> Unit) {
                 explanation = "Stops a long red light turning into a dozen entries for the car in front.",
             ) { edit { s -> s.copy(dedupRadiusMeters = it.roundToInt()) } }
 
+            SectionHeader("Registration tabs")
+
+            SwitchSetting(
+                title = "Read the tab date",
+                checked = settings.readTabs,
+                explanation = "Reads the expiry month and year printed on the tab. It is read as text, " +
+                    "not guessed from the tab colour \u2014 the colour cycle repeats every five years, " +
+                    "so a colour matches three different years in any decade and encodes no month at all.",
+            ) { edit { s -> s.copy(readTabs = it) } }
+
+            SwitchSetting(
+                title = "Alert on an expired tab",
+                checked = settings.alertOnExpiredTab,
+                explanation = "Sounds the watchlist alert when a tab reads as out of date. Off by default: " +
+                    "tabs are only legible up close, so this stays quiet most of the time.",
+            ) { edit { s -> s.copy(alertOnExpiredTab = it) } }
+
             SectionHeader("Recording")
 
             SwitchSetting(

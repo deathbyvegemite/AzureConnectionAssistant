@@ -44,6 +44,16 @@ data class SightingEntity(
     val vehicleModel: String? = null,
     val vehicleBodyType: String? = null,
 
+    /**
+     * Registration tab, read as printed text. The colour is stored only so a
+     * recoloured tab can be spotted; it is never the source of [tabYear].
+     */
+    val tabMonth: Int? = null,
+    val tabYear: Int? = null,
+    val tabStatus: String? = null,
+    val tabColor: String? = null,
+    val tabColorMismatch: Boolean? = null,
+
     val plateImagePath: String? = null,
     val vehicleImagePath: String? = null,
 
