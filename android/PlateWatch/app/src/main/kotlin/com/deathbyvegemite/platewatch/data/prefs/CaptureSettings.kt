@@ -10,7 +10,7 @@ import com.deathbyvegemite.platewatch.core.sighting.AggregatorConfig
  * worse than no plate at all.
  */
 data class CaptureSettings(
-    val regionId: String = "AU",
+    val regionId: String = "US",
     /** Frames that must agree before anything is written down. */
     val minConfirmations: Int = 3,
     val confirmWindowSeconds: Int = 6,
@@ -28,6 +28,10 @@ data class CaptureSettings(
     val keepScreenOn: Boolean = true,
     val resolveAddresses: Boolean = true,
     val alertOnWatchlist: Boolean = true,
+    /** Read the expiry month and year printed on the registration tab. */
+    val readTabs: Boolean = true,
+    /** Alert like a watchlist hit when a tab reads as expired. */
+    val alertOnExpiredTab: Boolean = false,
 ) {
     fun toAggregatorConfig(): AggregatorConfig = AggregatorConfig(
         minConfirmations = minConfirmations.coerceAtLeast(1),

@@ -12,7 +12,8 @@ object CsvExport {
         "id", "plate", "raw_plate", "region", "format", "confidence", "reads",
         "first_seen", "last_seen", "latitude", "longitude", "accuracy_m",
         "speed_kmh", "bearing_deg", "address", "colour", "make", "model",
-        "body_type", "flagged", "notes",
+        "body_type", "tab_month", "tab_year", "tab_status", "tab_colour",
+        "tab_colour_mismatch", "flagged", "notes",
     )
 
     fun write(records: List<SightingRecord>, zone: ZoneId = ZoneId.systemDefault()): String {
@@ -39,6 +40,11 @@ object CsvExport {
                 r.vehicleMake.orEmpty(),
                 r.vehicleModel.orEmpty(),
                 r.vehicleBodyType.orEmpty(),
+                r.tabMonth?.toString().orEmpty(),
+                r.tabYear?.toString().orEmpty(),
+                r.tabStatus.orEmpty(),
+                r.tabColor.orEmpty(),
+                r.tabColorMismatch?.let { if (it) "yes" else "no" }.orEmpty(),
                 if (r.flagged) "yes" else "no",
                 r.notes.orEmpty(),
             )

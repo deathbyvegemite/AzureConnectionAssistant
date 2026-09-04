@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -30,6 +31,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -50,6 +52,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.deathbyvegemite.platewatch.core.tab.TabStatus
 import com.deathbyvegemite.platewatch.data.db.SightingEntity
 import com.deathbyvegemite.platewatch.ui.formatConfidence
 import com.deathbyvegemite.platewatch.ui.formatCoordinates
@@ -168,6 +171,9 @@ fun SightingDetailScreen(sightingId: Long, onBack: () -> Unit) {
             DetailRow("Heading", current.bearingDegrees?.let { "${it.toInt()}°" } ?: "—")
             DetailRow("Plate format", current.formatId ?: "—")
 
+            Spacer(Modifier.height(16.dp))
+            TabSection(current)
+
             if (current.latitude != null && current.longitude != null) {
                 Spacer(Modifier.height(8.dp))
                 OutlinedButton(onClick = {
@@ -267,3 +273,90 @@ private fun EditField(
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
     )
 }
+
+/**
+ * The registration tab, as read.
+ *
+ * The month and year shown here came off the tab as *text*. Colour appears only as a
+ * cross-check: Washington's tab colours run on a five-year cycle, so a colour matches
+ * three different years in any given decade and carries no month information at all.
+ * A disagreement between the printed year and the paint is the interesting case —
+ * recolouring an expired tab is a cheap and well-documented forgery.
+ */
+@Composable
+private fun TabSection(sighting: SightingEntity) {
+    val status = runCatching { TabStatus.valueOf(sighting.tabStatus ?: "UNKNOWN") }
+        .getOrDefault(TabStatus.UNKNOWN)
+
+    Text("Registration tab", fontWeight = FontWeight.Bold)
+
+    if (sighting.tabMonth == null && sighting.tabYear == null) {
+        Text(
+            "Not legible in this frame. Tabs are small, so they usually only read at " +
+                "close range \u2014 in a queue, or parked.",
+            fontSize = 12.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        return
+    }
+
+    val printed = listOfNotNull(
+        sighting.tabMonth?.let { MONTH_NAMES.getOrNull(it - 1) },
+        sighting.tabYear?.toString(),
+    ).joinToString(" ")
+
+    Row(Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(printed, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+        Spacer(Modifier.width(10.dp))
+        StatusChip(status)
+    }
+
+    if (sighting.tabColorMismatch == true) {
+        Spacer(Modifier.height(8.dp))
+        Surface(
+            color = MaterialTheme.colorScheme.error,
+            shape = RoundedCornerShape(8.dp),
+        ) {
+            Column(Modifier.padding(10.dp)) {
+                Text("Colour does not match the printed year", fontWeight = FontWeight.Bold, color = Color.White)
+                Text(
+                    "The tab reads ${sighting.tabYear}, but it sampled as " +
+                        "${sighting.tabColor ?: "an unexpected colour"}. Worth a look at the crop \u2014 " +
+                        "though poor light shifts colour badly, so this is a prompt, not a finding.",
+                    fontSize = 12.sp,
+                    color = Color.White,
+                )
+            }
+        }
+    } else if (sighting.tabColor != null) {
+        Text(
+            "Tab colour sampled as ${sighting.tabColor}, consistent with ${sighting.tabYear}.",
+            fontSize = 12.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun StatusChip(status: TabStatus) {
+    val (label, color) = when (status) {
+        TabStatus.VALID -> "Current" to MaterialTheme.colorScheme.primary
+        TabStatus.EXPIRING_SOON -> "Expires soon" to MaterialTheme.colorScheme.secondary
+        TabStatus.EXPIRED -> "Expired" to MaterialTheme.colorScheme.error
+        TabStatus.UNKNOWN -> "Unknown" to MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    Surface(color = color, shape = RoundedCornerShape(6.dp)) {
+        Text(
+            label,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.background,
+        )
+    }
+}
+
+private val MONTH_NAMES = listOf(
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
+)

@@ -121,6 +121,11 @@ class SightingRepository(
         vehicleBodyType = e.vehicleBodyType,
         notes = e.notes,
         flagged = e.flagged,
+        tabMonth = e.tabMonth,
+        tabYear = e.tabYear,
+        tabStatus = e.tabStatus,
+        tabColor = e.tabColor,
+        tabColorMismatch = e.tabColorMismatch,
     )
 
     companion object {

@@ -43,6 +43,11 @@ object JsonExport {
                 "\"make\": ${quoteOrNull(r.vehicleMake)}",
                 "\"model\": ${quoteOrNull(r.vehicleModel)}",
                 "\"bodyType\": ${quoteOrNull(r.vehicleBodyType)}",
+                "\"tabMonth\": ${r.tabMonth ?: "null"}",
+                "\"tabYear\": ${r.tabYear ?: "null"}",
+                "\"tabStatus\": ${quoteOrNull(r.tabStatus)}",
+                "\"tabColour\": ${quoteOrNull(r.tabColor)}",
+                "\"tabColourMismatch\": ${r.tabColorMismatch ?: "null"}",
                 "\"flagged\": ${r.flagged}",
                 "\"notes\": ${quoteOrNull(r.notes)}",
             )

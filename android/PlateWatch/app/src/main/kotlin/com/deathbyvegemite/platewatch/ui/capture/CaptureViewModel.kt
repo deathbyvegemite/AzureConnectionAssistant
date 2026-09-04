@@ -13,6 +13,10 @@ import com.deathbyvegemite.platewatch.core.plate.PlateTextParser
 import com.deathbyvegemite.platewatch.core.sighting.AggregateResult
 import com.deathbyvegemite.platewatch.core.sighting.PlateReading
 import com.deathbyvegemite.platewatch.core.sighting.SightingAggregator
+import com.deathbyvegemite.platewatch.core.tab.TabColorCycle
+import com.deathbyvegemite.platewatch.core.tab.TabExpiry
+import com.deathbyvegemite.platewatch.core.tab.TabStatus
+import com.deathbyvegemite.platewatch.core.tab.TabTextParser
 import com.deathbyvegemite.platewatch.data.db.SightingEntity
 import com.deathbyvegemite.platewatch.data.prefs.CaptureSettings
 import kotlinx.coroutines.channels.BufferOverflow
@@ -22,6 +26,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.LocalDate
 
 /** One plate this session put into the log, for the live strip on the capture screen. */
 data class LoggedPlate(
@@ -31,6 +36,7 @@ data class LoggedPlate(
     val color: String?,
     val confidence: Float,
     val onWatchlist: Boolean,
+    val tabStatus: TabStatus = TabStatus.UNKNOWN,
 )
 
 data class CaptureUiState(
@@ -107,6 +113,7 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
         frameIntervalMs = settings.frameIntervalMs,
         minFrameScore = settings.minFrameScore,
         wantCrops = settings.savePhotos,
+        tabParser = if (settings.readTabs) TabTextParser(LocalDate.now().year) else null,
     )
 
     /** Called from the camera analysis thread. Must not block. */
@@ -187,6 +194,14 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
             ?.takeIf { settings.savePhotos }
             ?.let { container.photos.save(it, "${stamp}_vehicle") }
 
+        val today = LocalDate.now()
+        val tabStatus = TabExpiry.evaluate(
+            reading = frame.tabReading,
+            nowYear = today.year,
+            nowMonth = today.monthValue,
+        )
+        val colorCheck = TabColorCycle.checkConsistency(frame.tabReading?.year, frame.tabColorName)
+
         val entity = SightingEntity(
             plate = result.plate,
             rawPlate = result.reading.raw,
@@ -203,6 +218,15 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
             bearingDegrees = fix?.takeIf { it.hasBearing() }?.bearing,
             address = null,
             vehicleColor = frame.colorName,
+            tabMonth = frame.tabReading?.month,
+            tabYear = frame.tabReading?.year,
+            tabStatus = tabStatus.name,
+            tabColor = frame.tabColorName,
+            tabColorMismatch = when (colorCheck) {
+                TabColorCycle.Consistency.MISMATCH -> true
+                TabColorCycle.Consistency.CONSISTENT -> false
+                TabColorCycle.Consistency.UNKNOWN -> null
+            },
             plateImagePath = platePath,
             vehicleImagePath = vehiclePath,
         )
@@ -211,7 +235,12 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
         aggregator.attachSightingId(result.plate, id)
 
         val onWatchlist = result.plate in watchlist
-        if (onWatchlist && settings.alertOnWatchlist) alerts.watchlistHit() else alerts.logged()
+        val expiredTab = tabStatus == TabStatus.EXPIRED && settings.alertOnExpiredTab
+        if ((onWatchlist && settings.alertOnWatchlist) || expiredTab) {
+            alerts.watchlistHit()
+        } else {
+            alerts.logged()
+        }
 
         _uiState.update { state ->
             state.copy(
@@ -226,6 +255,7 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
                             color = frame.colorName,
                             confidence = result.confidence,
                             onWatchlist = onWatchlist,
+                            tabStatus = tabStatus,
                         ),
                     ) + state.recent
                     ).take(MAX_RECENT),

@@ -19,6 +19,10 @@ class ExportTest {
         plate: String = "BK47QT",
         address: String? = "12 Smith St, Newtown",
         notes: String? = null,
+        tabMonth: Int? = 9,
+        tabYear: Int? = 2026,
+        tabStatus: String? = "VALID",
+        tabColorMismatch: Boolean? = false,
     ) = SightingRecord(
         id = id,
         plate = plate,
@@ -41,6 +45,11 @@ class ExportTest {
         vehicleBodyType = "Ute",
         notes = notes,
         flagged = false,
+        tabMonth = tabMonth,
+        tabYear = tabYear,
+        tabStatus = tabStatus,
+        tabColor = "Blue",
+        tabColorMismatch = tabColorMismatch,
     )
 
     @Test
@@ -87,6 +96,77 @@ class ExportTest {
     fun `empty log still produces a usable header row`() {
         val csv = CsvExport.write(emptyList(), utc)
         assertEquals(CsvExport.COLUMNS.joinToString(","), csv.trim())
+    }
+
+    /**
+     * Splits one CSV row the way a spreadsheet would, honouring quoted fields.
+     *
+     * A plain `split(",")` misaligns every column after the address, because the
+     * address legitimately contains a comma — which is the whole reason the writer
+     * quotes it.
+     */
+    private fun splitCsvRow(line: String): List<String> {
+        val fields = mutableListOf<String>()
+        val current = StringBuilder()
+        var inQuotes = false
+        var i = 0
+        while (i < line.length) {
+            val c = line[i]
+            when {
+                inQuotes && c == '"' && i + 1 < line.length && line[i + 1] == '"' -> {
+                    current.append('"'); i++
+                }
+                c == '"' -> inQuotes = !inQuotes
+                c == ',' && !inQuotes -> { fields += current.toString(); current.clear() }
+                else -> current.append(c)
+            }
+            i++
+        }
+        fields += current.toString()
+        return fields
+    }
+
+    @Test
+    fun `quoted fields survive a round trip through a csv reader`() {
+        val csv = CsvExport.write(listOf(record(notes = "said \"hello\", then left")), utc)
+        val header = splitCsvRow(csv.lines()[0])
+        val row = splitCsvRow(csv.lines()[1])
+        assertEquals(header.size, row.size, "column count mismatch: $csv")
+        assertEquals("12 Smith St, Newtown", row[header.indexOf("address")])
+        assertEquals("said \"hello\", then left", row[header.indexOf("notes")])
+    }
+
+    @Test
+    fun `csv carries the registration tab columns`() {
+        val csv = CsvExport.write(listOf(record()), utc)
+        val header = splitCsvRow(csv.lines()[0])
+        assertTrue(header.containsAll(listOf("tab_month", "tab_year", "tab_status", "tab_colour", "tab_colour_mismatch")))
+        val row = splitCsvRow(csv.lines()[1])
+        assertEquals("9", row[header.indexOf("tab_month")])
+        assertEquals("2026", row[header.indexOf("tab_year")])
+        assertEquals("VALID", row[header.indexOf("tab_status")])
+        assertEquals("no", row[header.indexOf("tab_colour_mismatch")])
+    }
+
+    @Test
+    fun `an unread tab exports as empty rather than a guess`() {
+        val csv = CsvExport.write(
+            listOf(record(tabMonth = null, tabYear = null, tabStatus = "UNKNOWN", tabColorMismatch = null)),
+            utc,
+        )
+        val header = splitCsvRow(csv.lines()[0])
+        val row = splitCsvRow(csv.lines()[1])
+        assertEquals("", row[header.indexOf("tab_month")])
+        assertEquals("", row[header.indexOf("tab_year")])
+        assertEquals("", row[header.indexOf("tab_colour_mismatch")])
+    }
+
+    @Test
+    fun `json carries the tab fields with real nulls`() {
+        val json = JsonExport.write(listOf(record(tabMonth = null, tabYear = null)), utc, 1_700_000_000_000)
+        assertTrue(json.contains("\"tabMonth\": null"), json)
+        assertTrue(json.contains("\"tabYear\": null"), json)
+        assertTrue(json.contains("\"tabStatus\": \"VALID\""), json)
     }
 
     @Test
