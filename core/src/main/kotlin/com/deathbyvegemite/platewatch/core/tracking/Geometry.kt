@@ -90,14 +90,19 @@ object CropGeometry {
     /**
      * The bodywork directly above the plate — boot lid, badge, rear window. Wide
      * enough to recognise the vehicle by eye, and what the colour estimate samples.
+     *
+     * [padding] grows the region on every edge, in the same plate-relative units as
+     * the base factors below. The live-frame caller takes the default of none; the
+     * hi-res still path — captured a beat after the box was observed, once the car
+     * has moved on a bit further — passes extra padding to cover that drift.
      */
-    fun vehicle(box: NormalizedBox): NormalizedBox {
-        val halfWidth = box.width * VEHICLE_WIDTH_FACTOR / 2f
+    fun vehicle(box: NormalizedBox, padding: Float = 0f): NormalizedBox {
+        val halfWidth = box.width * (VEHICLE_WIDTH_FACTOR / 2f + padding)
         return NormalizedBox(
             box.centerX - halfWidth,
-            box.top - box.height * VEHICLE_TOP_FACTOR,
+            box.top - box.height * (VEHICLE_TOP_FACTOR + padding),
             box.centerX + halfWidth,
-            box.top - box.height * VEHICLE_BOTTOM_FACTOR,
+            box.top - box.height * (VEHICLE_BOTTOM_FACTOR - padding).coerceAtLeast(0f),
         ).clamped()
     }
 
@@ -109,7 +114,11 @@ object CropGeometry {
         box.top + box.height * 0.15f,
     ).clamped()
 
-    const val VEHICLE_WIDTH_FACTOR = 2.2f
-    const val VEHICLE_TOP_FACTOR = 2.0f
-    const val VEHICLE_BOTTOM_FACTOR = 0.35f
+    // Widened from the original 2.2 / 2.0 / 0.35: field testing showed the old,
+    // tighter region missing the vehicle entirely on anything but a dead-on,
+    // head-on/rear-on framing — a wider band that starts closer to the plate is
+    // more forgiving of angle and of the plate box itself being a little off.
+    const val VEHICLE_WIDTH_FACTOR = 2.6f
+    const val VEHICLE_TOP_FACTOR = 2.4f
+    const val VEHICLE_BOTTOM_FACTOR = 0.15f
 }

@@ -75,6 +75,17 @@ class CropGeometryTest {
     }
 
     @Test
+    fun `padding widens the vehicle region without moving its centre or crossing the plate`() {
+        val box = plate(0.5f, 0.6f, 0.08f)
+        val base = CropGeometry.vehicle(box)
+        val padded = CropGeometry.vehicle(box, padding = 0.3f)
+        assertTrue(padded.width > base.width)
+        assertTrue(padded.top < base.top, "padding should push the far edge further away")
+        assertTrue(padded.bottom <= box.top, "padding should never push the near edge past the plate")
+        near(base.centerX, padded.centerX)
+    }
+
+    @Test
     fun `regions are clamped to the frame`() {
         val box = plate(0.05f, 0.05f, 0.08f)  // plate jammed into the top-left corner
         for (r in listOf(CropGeometry.plate(box), CropGeometry.vehicle(box), CropGeometry.tab(box))) {

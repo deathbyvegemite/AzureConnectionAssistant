@@ -448,7 +448,7 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
             if (still == null) return@captureStill
             viewModelScope.launch(Dispatchers.Default) {
                 val plate = HiResCropper.crop(still, CropGeometry.plate(box, padding = HI_RES_PLATE_PADDING))
-                val vehicle = HiResCropper.crop(still, CropGeometry.vehicle(box))
+                val vehicle = HiResCropper.crop(still, CropGeometry.vehicle(box, padding = HI_RES_VEHICLE_PADDING))
                 val platePath = plate?.let { container.photos.save(it, "${stamp}_plate_hires", quality = 92) }
                 val vehiclePath = vehicle?.let { container.photos.save(it, "${stamp}_vehicle_hires", quality = 88) }
                 plate?.recycle()
@@ -474,8 +474,15 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
         const val TICK_MS = 250L
         /** How long after the last sighting the zoom lets go and returns to the resting level. */
         const val RELEASE_AFTER_MS = 500L
-        /** Extra margin on the still crop, for the distance the car covers meanwhile. */
-        const val HI_RES_PLATE_PADDING = 0.4f
+        /**
+         * Extra margin on the still crop, for the distance the car covers meanwhile.
+         * Was 0.4 — generous enough that dealer-frame text and background routinely
+         * bled into the saved plate photo. Halved to still cover real drift without
+         * padding out most of what actually gets shown.
+         */
+        const val HI_RES_PLATE_PADDING = 0.2f
+        /** Same idea as [HI_RES_PLATE_PADDING], applied to the vehicle region. */
+        const val HI_RES_VEHICLE_PADDING = 0.3f
         /** Zoom change per tap of the on-screen +/− control. */
         const val ZOOM_STEP = 0.5f
     }
