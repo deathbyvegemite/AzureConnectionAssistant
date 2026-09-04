@@ -113,6 +113,19 @@ dependencies, covered by 77 unit tests. Run them on a laptop in seconds:
 
 ## Building and sideloading
 
+### The easy way: let CI build it
+
+`.github/workflows/platewatch-android.yml` builds the app on every push that
+touches `android/PlateWatch/`, and uploads the debug APK as a workflow artifact.
+Open the run in the **Actions** tab, download `platewatch-debug-apk`, and sideload
+it — no local Android toolchain needed by anyone.
+
+That workflow is also where the app gets compiled at all: it was written in an
+environment with no route to Google's Maven repository, so CI is the first thing
+to put a real compiler over the `app` module.
+
+### Building locally
+
 Requires Android Studio (or the command-line SDK) with **API 35** and **JDK 17**.
 
 ```bash
