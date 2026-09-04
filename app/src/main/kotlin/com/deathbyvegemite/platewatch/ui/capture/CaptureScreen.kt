@@ -58,6 +58,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -185,8 +186,6 @@ fun CaptureScreen(
             hasFix = state.hasLocationFix,
             accuracy = state.locationAccuracyMeters,
             pending = state.pendingPlates,
-            zoomRatio = state.zoomRatio,
-            tracking = state.tracking,
             torchOn = torchOn,
             onToggleTorch = { torchOn = !torchOn },
             onOpenLog = onOpenLog,
@@ -252,8 +251,6 @@ private fun StatusBar(
     hasFix: Boolean,
     accuracy: Float?,
     pending: List<String>,
-    zoomRatio: Float,
-    tracking: Boolean,
     torchOn: Boolean,
     onToggleTorch: () -> Unit,
     onOpenLog: () -> Unit,
@@ -267,24 +264,36 @@ private fun StatusBar(
     ) {
         Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = if (running) "LOGGING" else "PAUSED",
-                    color = if (running) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 13.sp,
-                )
-                Spacer(Modifier.width(12.dp))
-                Text("$sessionCount this session", fontSize = 13.sp, color = Color.White)
-                if (zoomRatio > 1.01f || tracking) {
-                    Spacer(Modifier.width(10.dp))
+                // Everything in this inner row is status text, not a control — it is
+                // the one part of the bar allowed to run out of room. Weighting it
+                // (rather than the trailing icons) means growth here — a long
+                // session count, in particular — truncates instead of silently
+                // pushing GPS status, torch, log or Settings off the edge of the
+                // screen. This is deliberately the *only* thing that competes for
+                // space with those controls: the zoom readout that used to sit here
+                // was removed rather than fought with, since the control panel below
+                // already shows zoom, bigger, at all times.
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     Text(
-                        text = "${"%.1f".format(zoomRatio)}\u00d7" + if (tracking) " \u25cf" else "",
-                        fontSize = 13.sp,
+                        text = if (running) "LOGGING" else "PAUSED",
+                        color = if (running) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                         fontWeight = FontWeight.Bold,
-                        color = if (tracking) MaterialTheme.colorScheme.secondary else Color.White,
+                        fontSize = 13.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Text(
+                        "$sessionCount this session",
+                        fontSize = 13.sp,
+                        color = Color.White,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
-                Spacer(Modifier.weight(1f))
                 Icon(
                     imageVector = if (hasFix) Icons.Default.LocationOn else Icons.Default.LocationOff,
                     contentDescription = if (hasFix) "GPS fix" else "No GPS fix",
@@ -292,7 +301,7 @@ private fun StatusBar(
                     modifier = Modifier.size(18.dp),
                 )
                 accuracy?.let {
-                    Text(" ±${it.toInt()}m", fontSize = 12.sp, color = Color.White)
+                    Text(" ±${it.toInt()}m", fontSize = 12.sp, color = Color.White, maxLines = 1)
                 }
                 IconButton(onClick = onToggleTorch) {
                     Icon(
