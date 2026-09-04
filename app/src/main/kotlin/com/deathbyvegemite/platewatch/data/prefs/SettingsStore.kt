@@ -49,6 +49,7 @@ class SettingsStore(private val context: Context) {
             exposureBias = p[Keys.EXPOSURE_BIAS] ?: d.exposureBias,
             hiResStills = p[Keys.HI_RES_STILLS] ?: d.hiResStills,
             requireVehicleDetection = p[Keys.REQUIRE_VEHICLE] ?: d.requireVehicleDetection,
+            baseZoomRatio = p[Keys.BASE_ZOOM] ?: d.baseZoomRatio,
         )
     }
 
@@ -75,6 +76,7 @@ class SettingsStore(private val context: Context) {
         p[Keys.EXPOSURE_BIAS] = s.exposureBias
         p[Keys.HI_RES_STILLS] = s.hiResStills
         p[Keys.REQUIRE_VEHICLE] = s.requireVehicleDetection
+        p[Keys.BASE_ZOOM] = s.baseZoomRatio
     }
 
     private object Keys {
@@ -100,5 +102,6 @@ class SettingsStore(private val context: Context) {
         val EXPOSURE_BIAS = intPreferencesKey("exposure_bias")
         val HI_RES_STILLS = booleanPreferencesKey("hi_res_stills")
         val REQUIRE_VEHICLE = booleanPreferencesKey("require_vehicle_detection")
+        val BASE_ZOOM = floatPreferencesKey("base_zoom_ratio")
     }
 }

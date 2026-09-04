@@ -23,12 +23,14 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.FlashOff
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.LocationOff
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.Button
@@ -38,8 +40,8 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -47,6 +49,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -54,6 +57,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -63,10 +67,12 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.deathbyvegemite.platewatch.capture.PlateAnalyzer
 import com.deathbyvegemite.platewatch.ui.formatConfidence
+import com.deathbyvegemite.platewatch.ui.rememberAppContainer
 import com.deathbyvegemite.platewatch.ui.formatTime
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import java.util.concurrent.Executors
+import kotlinx.coroutines.launch
 
 @Composable
 fun CaptureScreen(
@@ -78,6 +84,8 @@ fun CaptureScreen(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val settingsContainer = rememberAppContainer()
+    val scope = rememberCoroutineScope()
 
     var hasCamera by remember {
         mutableStateOf(
@@ -198,9 +206,14 @@ fun CaptureScreen(
             running = state.running,
             recent = state.recent,
             autoZoom = state.settings.autoZoom,
+            tracking = state.tracking,
             zoomRatio = state.zoomRatio,
+            baseZoom = state.settings.baseZoomRatio,
             maxZoom = state.settings.maxAutoZoom,
-            onZoomChange = viewModel::onManualZoom,
+            onZoomStep = viewModel::onZoomStep,
+            onAutoZoomChange = { enabled ->
+                scope.launch { settingsContainer.settingsStore.update { it.copy(autoZoom = enabled) } }
+            },
             onToggleRunning = {
                 if (state.running) viewModel.onCaptureStopped() else viewModel.onCaptureStarted()
             },
@@ -326,9 +339,12 @@ private fun ControlPanel(
     running: Boolean,
     recent: List<LoggedPlate>,
     autoZoom: Boolean,
+    tracking: Boolean,
     zoomRatio: Float,
+    baseZoom: Float,
     maxZoom: Float,
-    onZoomChange: (Float) -> Unit,
+    onZoomStep: (Int) -> Unit,
+    onAutoZoomChange: (Boolean) -> Unit,
     onToggleRunning: () -> Unit,
     onOpenSighting: (Long) -> Unit,
     modifier: Modifier = Modifier,
@@ -348,24 +364,38 @@ private fun ControlPanel(
                 Spacer(Modifier.height(10.dp))
             }
 
-            if (autoZoom) {
-                Text(
-                    "Auto zoom \u2014 following plates up to ${"%.1f".format(maxZoom)}\u00d7",
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(bottom = 8.dp),
-                )
-            } else {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Zoom ${"%.1f".format(zoomRatio)}\u00d7", fontSize = 12.sp, color = Color.White)
-                    Slider(
-                        value = zoomRatio.coerceIn(1f, maxZoom),
-                        onValueChange = onZoomChange,
-                        valueRange = 1f..maxZoom.coerceAtLeast(1.01f),
-                        modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
-                    )
+            // Always on screen — tapping +/− works whether auto-zoom is on or off,
+            // and takes over from wherever tracking currently has the lens, the way a
+            // camera app's own zoom does when you grab it away from autofocus.
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = { onZoomStep(-1) }) {
+                    Icon(Icons.Default.Remove, "Zoom out", tint = Color.White)
                 }
+                Text(
+                    "${"%.1f".format(zoomRatio)}\u00d7",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (tracking) MaterialTheme.colorScheme.secondary else Color.White,
+                    modifier = Modifier.width(64.dp),
+                    textAlign = TextAlign.Center,
+                )
+                IconButton(onClick = { onZoomStep(1) }) {
+                    Icon(Icons.Default.Add, "Zoom in", tint = Color.White)
+                }
+                Spacer(Modifier.weight(1f))
+                Text("Auto", fontSize = 12.sp, color = Color.White)
+                Switch(checked = autoZoom, onCheckedChange = onAutoZoomChange)
             }
+            Text(
+                text = if (autoZoom) {
+                    "Rests at ${"%.1f".format(baseZoom)}\u00d7, follows plates up to ${"%.1f".format(maxZoom)}\u00d7"
+                } else {
+                    "Manual \u2014 tracking will not move the zoom"
+                },
+                fontSize = 11.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 8.dp),
+            )
 
             Button(
                 onClick = onToggleRunning,

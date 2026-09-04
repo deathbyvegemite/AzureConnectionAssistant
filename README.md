@@ -128,7 +128,8 @@ moving car, for reasons that have nothing to do with the camera:
   speed under a threshold — usually not at all.
 - **Being zoomed in on nothing is the expensive state.** Every other car in the frame
   is lost. So zooming in is rate-limited and needs two agreeing frames, while zooming
-  out is immediate and happens the moment a plate is gone.
+  out is immediate and happens the moment a plate is gone — settling back to the
+  *resting zoom*, not necessarily 1×. See below.
 
 The tracker does its arithmetic in 1× equivalent units — every offset and size
 divided by the current zoom — so that a zoom change alone produces zero apparent
@@ -144,11 +145,26 @@ What actually moves the needle, roughly in order:
 2. **Analysis resolution.** Glyphs are small. 1080p reads noticeably further than
    720p, and a Galaxy S25 Ultra runs it without complaint. 4K is offered; it is
    hotter and gains less than you would hope.
-3. **Zoom, within the rules above.** The default ceiling is 2.5×, and that number is
-   the S25 Ultra talking: up to about 3× the phone serves a crop from the
-   200-megapixel main sensor, which is sharp and changes nothing else. Past that it
-   switches to the telephoto lens, which refocuses and re-exposes — a few hundred
-   milliseconds of unreadable frames at exactly the moment the plate is closest.
+3. **Zoom, within the rules above.** Two independent settings, not one:
+   - **Resting zoom** — where the camera sits with nothing tracked: both what a
+     session starts at and what it settles back to once a plate is lost. Defaults to
+     2.5×. A camera watching one fixed spot can sit zoomed in here with nothing to
+     lose; a phone in a moving car should keep this near 1× so it is not missing side
+     traffic while idle.
+   - **Maximum automatic zoom** — how far tracking is allowed to reach. Defaults to
+     10×. Zooming past roughly 2.5–3× switches a Galaxy S25 Ultra onto its telephoto
+     lens, which refocuses and re-exposes — a few hundred milliseconds of unreadable
+     frames right as the zoom crosses that boundary — but only once per zoom-in, not
+     continuously, and plenty of phones' telephoto lenses hold a lock well past that
+     point regardless. Lower it if zoom hunts or the lens switch is visibly costing
+     more reads than the extra zoom buys.
+
+   Both are on the capture screen too: a **−** / **+** stepper next to an **Auto**
+   switch, so zoom is one tap away without a trip to Settings. Tapping it works
+   whether tracking is running or not — it takes over from wherever the lens
+   currently is, the same way grabbing a camera app's zoom ring overrides autofocus.
+   Manual zoom is capped at the *maximum automatic zoom* setting, so a manual
+   override never reaches further than tracking itself ever would.
 4. **A full-resolution still for the evidence photo.** The live analysis frame is
    ~1080p; when a plate is confirmed, the app also takes a ~9-megapixel still and
    crops the plate out of *that*. Several times the pixels across the plate — the
@@ -216,7 +232,7 @@ and why the fix runs a second, independent model rather than trying to make the 
 parser smarter.
 
 The whole of that logic lives in `:core`, a plain Kotlin module with no Android
-dependencies, covered by 119 unit tests. Run them on a laptop in seconds:
+dependencies, covered by 122 unit tests. Run them on a laptop in seconds:
 
 ```bash
 ./gradlew :core:test
@@ -294,6 +310,7 @@ Everything below is in Settings, and takes effect immediately.
 | One car logged over and over | Raise the **same-encounter window** and **radius** |
 | Tab date never populated | Expected at speed — tabs only read close up. Nothing to tune |
 | Zoom hunting or flapping | Lower **maximum automatic zoom**; the phone may switch lenses below the default |
+| Missing side traffic while idle | Lower **resting zoom** towards 1× — it defaults to 2.5×, tuned for a fixed camera watching one spot, not a moving patrol car |
 | Plates washing out at night | Turn on **meter on the plate** if off; try **exposure bias** at −2 |
 | Plates from a video, sign or screen getting logged | Make sure **confirm a vehicle before reading a plate** is on (it is by default) |
 | Frame rate feels low with the vehicle gate on | Expected — a detector now runs on every analysed frame. Drop **analysis resolution**, or turn the gate off and accept the risk |

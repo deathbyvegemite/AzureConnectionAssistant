@@ -22,6 +22,15 @@ data class ZoomPolicyConfig(
     val hysteresis: Float = 0.15f,
     /** Motion cannot be estimated from one frame, so wait for this many. */
     val minObservations: Int = 2,
+    /**
+     * Where the zoom sits when nothing is being tracked — both the level a capture
+     * session starts at and the level it settles back to once a plate is lost. A
+     * stationary camera watching one spot can sit zoomed in here with nothing to
+     * lose; a phone in a moving car should keep this near 1× so nothing beside the
+     * one plate already being read is missed. Independent of [maxZoom]: this is
+     * where zoom *rests*, not how far it is allowed to *reach*.
+     */
+    val baseZoom: Float = 1f,
 )
 
 /**
@@ -44,11 +53,16 @@ data class ZoomPolicyConfig(
  *    decision costs little; zooming out is never limited, because being zoomed in
  *    on nothing is the expensive state — every other car in the frame is lost.
  *
- * On the Galaxy S25 Ultra specifically, the default ceiling of 2.5× is deliberate:
- * up to about 3× the phone serves a crop from the 200-megapixel main sensor, which
- * is sharp and changes nothing else. Past that it switches to the telephoto lens,
+ * The default ceiling and resting zoom are conservative starting points, not fixed
+ * limits — both are configurable (see [ZoomPolicyConfig.maxZoom] and
+ * [ZoomPolicyConfig.baseZoom]). On a Galaxy S25 Ultra specifically: up to about 3×
+ * the phone serves a crop from the 200-megapixel main sensor, which is sharp and
+ * changes nothing else about capture. Past that it switches to the telephoto lens,
  * which costs a refocus and an exposure change — a few hundred milliseconds of
- * unreadable frames at exactly the moment the plate is closest.
+ * unreadable frames right as a zoom-in crosses that boundary. Some phones' telephoto
+ * lenses hold a lock well past that point regardless; [maxZoom] is deliberately not
+ * hard-capped in code at 2.5× so a ceiling like 10× is a legitimate choice where the
+ * hardware supports it — the trade is paid once per zoom-in, not continuously.
  */
 class ZoomPolicy(private val config: ZoomPolicyConfig = ZoomPolicyConfig()) {
 
@@ -58,7 +72,7 @@ class ZoomPolicy(private val config: ZoomPolicyConfig = ZoomPolicyConfig()) {
      * @return the zoom ratio to request; equal to [current] when nothing should change
      */
     fun decide(track: TrackState?, current: Float): Float {
-        if (track == null) return RELEASED
+        if (track == null) return config.baseZoom
         if (track.observations < config.minObservations) return current
 
         val latency = config.actuationLatencyMs / 1000f
@@ -71,11 +85,15 @@ class ZoomPolicy(private val config: ZoomPolicyConfig = ZoomPolicyConfig()) {
 
         val idealZoom = config.idealPlateHeight / track.height
 
-        var target = minOf(idealZoom, keepInFrame, config.maxZoom).coerceAtLeast(RELEASED)
+        // The floor here is the hardware minimum, not the configured resting zoom:
+        // an actively tracked plate that is already comfortably sized should be free
+        // to zoom out below baseZoom, all the way to 1×, not get held above it. Only
+        // the no-track early return above uses baseZoom.
+        var target = minOf(idealZoom, keepInFrame, config.maxZoom).coerceAtLeast(HARDWARE_MIN_ZOOM)
 
         val speed = maxOf(abs(track.velocityX), abs(track.velocityY))
         if (speed > 1e-3f && speed * target > config.maxLateralSpeed) {
-            target = minOf(target, config.maxLateralSpeed / speed).coerceAtLeast(RELEASED)
+            target = minOf(target, config.maxLateralSpeed / speed).coerceAtLeast(HARDWARE_MIN_ZOOM)
         }
 
         return when {
@@ -83,13 +101,14 @@ class ZoomPolicy(private val config: ZoomPolicyConfig = ZoomPolicyConfig()) {
                 val stepped = minOf(target, current + config.maxStepIn)
                 if (stepped - current < config.hysteresis) current else stepped
             }
-            target < current -> if (current - target < config.hysteresis && target > RELEASED) current else target
+            target < current ->
+                if (current - target < config.hysteresis && target > HARDWARE_MIN_ZOOM) current else target
             else -> current
         }
     }
 
-    companion object {
-        /** No zoom at all — full field of view, every car in the frame. */
-        const val RELEASED = 1f
+    private companion object {
+        /** No zoom at all — the camera's own floor, independent of where it rests. */
+        const val HARDWARE_MIN_ZOOM = 1f
     }
 }

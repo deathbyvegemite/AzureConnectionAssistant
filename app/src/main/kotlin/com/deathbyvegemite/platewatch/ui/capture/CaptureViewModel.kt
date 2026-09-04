@@ -108,7 +108,8 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
     private var watchlist: Set<String> = emptySet()
 
     private val tracker = PlateTracker()
-    private var zoomPolicy = ZoomPolicy(ZoomPolicyConfig(maxZoom = settings.maxAutoZoom))
+    private var zoomPolicy =
+        ZoomPolicy(ZoomPolicyConfig(maxZoom = settings.maxAutoZoom, baseZoom = settings.baseZoomRatio))
     private val meteringPolicy = MeteringPolicy()
     private var controls: CameraControls? = null
     private var tickerJob: Job? = null
@@ -131,14 +132,18 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
             container.settingsStore.settings.collect { next ->
                 val regionChanged = next.regionId != settings.regionId
                 val tuningChanged = next.toAggregatorConfig() != settings.toAggregatorConfig()
-                val zoomChanged = next.maxAutoZoom != settings.maxAutoZoom
+                val zoomChanged = next.maxAutoZoom != settings.maxAutoZoom || next.baseZoomRatio != settings.baseZoomRatio
                 val evChanged = next.exposureBias != settings.exposureBias
                 settings = next
                 if (regionChanged) parser = PlateTextParser(PlateRegions.byId(next.regionId))
                 if (regionChanged || tuningChanged) aggregator = SightingAggregator(next.toAggregatorConfig())
-                if (zoomChanged) zoomPolicy = ZoomPolicy(ZoomPolicyConfig(maxZoom = next.maxAutoZoom))
+                if (zoomChanged) {
+                    zoomPolicy = ZoomPolicy(ZoomPolicyConfig(maxZoom = next.maxAutoZoom, baseZoom = next.baseZoomRatio))
+                }
                 if (evChanged) controls?.setExposureCompensation(next.exposureBias)
-                if (!next.autoZoom && currentZoom != 1f) onManualZoom(1f)
+                // Switching auto-zoom off deliberately leaves the current zoom alone —
+                // manual control continues from wherever tracking left it, the way a
+                // camera app's own zoom does when you take over from autofocus.
                 _uiState.update { it.copy(settings = next) }
             }
         }
@@ -187,21 +192,33 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
     /** The screen hands over the bound camera; `null` when it is unbound. */
     fun attachControls(newControls: CameraControls?) {
         controls = newControls
+        val start = settings.baseZoomRatio
         newControls?.let {
             it.setExposureCompensation(settings.exposureBias)
-            it.setZoomRatio(1f)
+            it.setZoomRatio(start)
         }
-        currentZoom = 1f
-        _uiState.update { it.copy(zoomRatio = 1f, tracking = false) }
+        currentZoom = start
+        _uiState.update { it.copy(zoomRatio = start, tracking = false) }
     }
 
-    /** Manual zoom from the slider, used when automatic zoom is switched off. */
+    /**
+     * Manual zoom — from the on-screen +/− control, or from the fine slider when
+     * auto-zoom is off. Clamped to the smaller of the hardware ceiling and the
+     * configured [CaptureSettings.maxAutoZoom], so a manual override never reaches
+     * further than automatic tracking ever would.
+     */
     fun onManualZoom(ratio: Float) {
         val c = controls ?: return
-        val clamped = ratio.coerceIn(1f, c.maxZoomRatio.coerceAtLeast(1f))
+        val ceiling = minOf(c.maxZoomRatio.coerceAtLeast(1f), settings.maxAutoZoom.coerceAtLeast(1f))
+        val clamped = ratio.coerceIn(1f, ceiling)
         c.setZoomRatio(clamped)
         currentZoom = clamped
         _uiState.update { it.copy(zoomRatio = clamped) }
+    }
+
+    /** Zoom the given number of steps in (positive) or out (negative) from where it is now. */
+    fun onZoomStep(steps: Int) {
+        onManualZoom(currentZoom + steps * ZOOM_STEP)
     }
 
     fun onCaptureStarted() {
@@ -224,9 +241,10 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
         tracker.reset()
         meteringPolicy.reset()
         controls?.cancelMetering()
-        controls?.setZoomRatio(1f)
-        currentZoom = 1f
-        _uiState.update { it.copy(running = false, pendingPlates = emptyList(), zoomRatio = 1f, tracking = false) }
+        val rest = settings.baseZoomRatio
+        controls?.setZoomRatio(rest)
+        currentZoom = rest
+        _uiState.update { it.copy(running = false, pendingPlates = emptyList(), zoomRatio = rest, tracking = false) }
     }
 
     fun dismissWatchlistAlert() = _uiState.update { it.copy(watchlistAlert = null) }
@@ -454,9 +472,11 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
     private companion object {
         const val MAX_RECENT = 8
         const val TICK_MS = 250L
-        /** How long after the last sighting the zoom lets go and returns to 1×. */
+        /** How long after the last sighting the zoom lets go and returns to the resting level. */
         const val RELEASE_AFTER_MS = 500L
         /** Extra margin on the still crop, for the distance the car covers meanwhile. */
         const val HI_RES_PLATE_PADDING = 0.4f
+        /** Zoom change per tap of the on-screen +/− control. */
+        const val ZOOM_STEP = 0.5f
     }
 }
