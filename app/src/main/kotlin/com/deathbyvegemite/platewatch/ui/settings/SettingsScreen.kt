@@ -91,14 +91,28 @@ fun SettingsScreen(onBack: () -> Unit) {
             ) { edit { s -> s.copy(autoZoom = it) } }
 
             SliderSetting(
+                title = "Resting zoom",
+                value = settings.baseZoomRatio,
+                range = 1f..10f,
+                steps = 17,
+                display = "${"%.1f".format(settings.baseZoomRatio)}\u00d7",
+                explanation = "Where the camera sits when nothing is being tracked \u2014 both what a session " +
+                    "starts at and what it settles back to once a plate is lost. A camera watching one fixed " +
+                    "spot can rest zoomed in here with nothing to lose. In a moving car, keep this near 1\u00d7 " +
+                    "so side traffic is not missed while idle.",
+            ) { edit { s -> s.copy(baseZoomRatio = it) } }
+
+            SliderSetting(
                 title = "Maximum automatic zoom",
                 value = settings.maxAutoZoom,
-                range = 1f..5f,
-                steps = 7,
+                range = 1f..10f,
+                steps = 17,
                 display = "${"%.1f".format(settings.maxAutoZoom)}\u00d7",
-                explanation = "2.5\u00d7 keeps a Galaxy S25 Ultra on its main sensor. Past about 3\u00d7 it switches to " +
-                    "the telephoto lens, which refocuses and re-exposes \u2014 a few hundred milliseconds " +
-                    "of unreadable frames at exactly the wrong moment.",
+                explanation = "How far tracking is allowed to zoom in. Around 2.5\u00d7 keeps a Galaxy S25 " +
+                    "Ultra on its main sensor; past that it switches to the telephoto lens, which refocuses " +
+                    "and re-exposes \u2014 a few hundred milliseconds of unreadable frames right as the zoom " +
+                    "crosses that boundary. That cost is paid once per zoom-in, not continuously, so a higher " +
+                    "ceiling is worth trying if your phone's telephoto holds a lock well.",
             ) { edit { s -> s.copy(maxAutoZoom = it) } }
 
             SwitchSetting(

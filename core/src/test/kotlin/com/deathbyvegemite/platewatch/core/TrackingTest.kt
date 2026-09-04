@@ -262,6 +262,36 @@ class ZoomPolicyTest {
     }
 
     @Test
+    fun `rests at the configured base zoom, not always 1x`() {
+        val cfg = ZoomPolicyConfig(baseZoom = 2.5f)
+        assertEquals(2.5f, ZoomPolicy(cfg).decide(null, 1f))
+        assertEquals(2.5f, ZoomPolicy(cfg).decide(null, 7f))
+    }
+
+    @Test
+    fun `an actively tracked plate can zoom out below the resting level`() {
+        // Resting at 2.5x does not mean tracking is forced to stay at or above it —
+        // a plate that is already comfortably sized should be free to ease out
+        // towards the hardware floor, same as it always could.
+        val cfg = ZoomPolicyConfig(baseZoom = 2.5f, maxZoom = 10f, maxStepIn = 10f, hysteresis = 0f)
+        val track = tracked(
+            PlateObservation(0, plate(0.5f, 0.5f, 0.10f), 2.5f),
+            PlateObservation(200, plate(0.5f, 0.5f, 0.10f), 2.5f),
+        )
+        val target = ZoomPolicy(cfg).decide(track, 2.5f)
+        assertTrue(target < 2.5f, "expected to ease below the resting zoom, got $target")
+    }
+
+    @Test
+    fun `resting zoom and the automatic ceiling are independent settings`() {
+        // An unusual but legitimate configuration: rest higher than the ceiling
+        // tracking is allowed to reach. The no-track case honours the explicit
+        // resting choice rather than silently clamping it to maxZoom.
+        val cfg = ZoomPolicyConfig(baseZoom = 5f, maxZoom = 3f)
+        assertEquals(5f, ZoomPolicy(cfg).decide(null, 1f))
+    }
+
+    @Test
     fun `never returns below 1x`() {
         val policy = ZoomPolicy(cfg)
         val huge = tracked(

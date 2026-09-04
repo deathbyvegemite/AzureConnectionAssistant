@@ -38,10 +38,21 @@ data class CaptureSettings(
     /** Follow a detected plate and zoom towards it when that would help the read. */
     val autoZoom: Boolean = true,
     /**
-     * Ceiling for automatic zoom. 2.5× keeps a Galaxy S25 Ultra on its main sensor;
-     * past ~3× it switches lenses, which costs a refocus at the worst moment.
+     * Ceiling for automatic zoom. Around 2.5× keeps a Galaxy S25 Ultra on its main
+     * sensor; past that it switches to the telephoto lens, which costs a refocus at
+     * the worst moment — but only once per zoom-in, and some phones' telephoto
+     * lenses hold a lock well past that point regardless. Raise it if yours does.
      */
-    val maxAutoZoom: Float = 2.5f,
+    val maxAutoZoom: Float = 10f,
+    /**
+     * Where zoom sits when nothing is tracked: the level a session starts at and the
+     * level automatic zoom settles back to once a plate is lost. A camera watching
+     * one fixed spot can rest zoomed in here with nothing to lose; a phone in a
+     * moving car should keep this near 1× so it is not missing side traffic while
+     * idle. Independent of maxAutoZoom — this is where zoom rests, not how far it
+     * can reach.
+     */
+    val baseZoomRatio: Float = 2.5f,
     /** Point focus and exposure at the plate rather than the road. */
     val plateMetering: Boolean = true,
     /** Exposure compensation in camera steps; negative tames retro-reflective glare. */
