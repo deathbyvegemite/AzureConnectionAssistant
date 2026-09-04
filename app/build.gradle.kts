@@ -73,6 +73,12 @@ android {
 
     sourceSets["main"].java.srcDirs("src/main/kotlin")
 
+    // The vehicle-detector model (assets/efficientdet_lite0.tflite) is loaded by
+    // mmap-ing the asset directly; AAPT compressing it in the APK breaks that.
+    androidResources {
+        noCompress += "tflite"
+    }
+
     packaging {
         resources.excludes += setOf("/META-INF/{AL2.0,LGPL2.1}")
     }
@@ -109,6 +115,10 @@ dependencies {
     // Bundled (not Play-Services-backed) so the app works on a sideloaded phone
     // with no Google Play, and needs no model download on first run.
     implementation(libs.mlkit.text.recognition)
+
+    // Confirms a vehicle is actually in frame before any text near it is trusted as
+    // a plate. Model is bundled in assets/, so this needs no network access either.
+    implementation(libs.tensorflow.lite.task.vision)
 
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)

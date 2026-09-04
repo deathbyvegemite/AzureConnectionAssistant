@@ -19,6 +19,10 @@ data class NormalizedBox(val left: Float, val top: Float, val right: Float, val 
 
     fun isEmpty(): Boolean = width <= 0f || height <= 0f
 
+    /** Do these two boxes share any area at all? */
+    fun overlaps(other: NormalizedBox): Boolean =
+        left < other.right && right > other.left && top < other.bottom && bottom > other.top
+
     companion object {
         fun fromPixels(left: Int, top: Int, right: Int, bottom: Int, frameWidth: Int, frameHeight: Int) =
             NormalizedBox(

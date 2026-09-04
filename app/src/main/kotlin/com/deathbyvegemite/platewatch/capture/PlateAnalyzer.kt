@@ -18,6 +18,7 @@ import com.deathbyvegemite.platewatch.core.tab.TabTextParser
 import com.deathbyvegemite.platewatch.core.tracking.CropGeometry
 import com.deathbyvegemite.platewatch.core.tracking.NormalizedBox
 import com.deathbyvegemite.platewatch.core.tracking.PlateObservation
+import com.deathbyvegemite.platewatch.core.tracking.VehicleGate
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.Text
 import com.google.mlkit.vision.text.TextRecognizer
@@ -39,6 +40,12 @@ data class AnalyzerConfig(
      * worth zooming towards, because zooming is how it becomes good enough.
      */
     val trackMinScore: Float = 0.30f,
+    /**
+     * Confirms a vehicle is actually in frame before any text near it is trusted as
+     * a plate. Null disables the gate entirely: every plate-shaped run of text is
+     * considered, exactly as before this existed.
+     */
+    val vehicleDetector: VehicleDetector? = null,
 )
 
 /** One frame that produced a plausible plate. */
@@ -53,6 +60,8 @@ class PlateFrameResult(
     val tabColorName: String? = null,
     /** Where the plate was, so a high-resolution still can be cropped to it. */
     val plateBox: NormalizedBox? = null,
+    /** Body type from the vehicle detector, when the gate is on and confident enough. */
+    val bodyType: String? = null,
 )
 
 /**
@@ -68,6 +77,18 @@ class PlateFrameResult(
  *
  * It also feeds the tracker: every frame with a plausible plate, however weak, is
  * reported through [onObservation] so zoom and metering can be steered towards it.
+ *
+ * When [AnalyzerConfig.vehicleDetector] is set, no plate-shaped text is trusted
+ * unless it sits near an actual detected vehicle — see [VehicleGate]. That check
+ * happens inside [handle], after ML Kit has already finished reading the frame, not
+ * before. It would be cheaper to run the vehicle detector first and skip OCR
+ * entirely when nothing is there, but that means building the upright [Bitmap] (via
+ * `proxy.toBitmap()`) *before* handing the same underlying camera buffer to ML Kit's
+ * `InputImage.fromMediaImage`, an ordering this analyser has never exercised and
+ * cannot be verified without a device. Gating after the OCR call, in the exact
+ * position the bitmap conversion already ran in, costs one extra text-recognition
+ * pass on frames with no vehicle — the trade for not guessing at buffer-sharing
+ * behaviour blind.
  */
 class PlateAnalyzer(
     private val recognizer: TextRecognizer,
@@ -118,7 +139,32 @@ class PlateAnalyzer(
         uprightHeight: Int,
         settings: AnalyzerConfig,
     ) {
-        val match = bestMatch(text, uprightHeight, settings) ?: return
+        // The vehicle gate runs first, before any plate-shaped text is even
+        // considered. Building the bitmap here — rather than only after a match, as
+        // the rest of this function still does when the gate is off — is the one
+        // real added cost of turning the gate on: an upright frame is produced (and
+        // a detector run over it) even for frames that never had legible text at
+        // all, in exchange for never scoring or logging text that isn't near a
+        // vehicle in the first place.
+        var upright: Bitmap? = null
+        var vehicles: List<VehicleDetection> = emptyList()
+        val detector = settings.vehicleDetector
+        if (detector != null) {
+            upright = uprightBitmap(proxy, rotation)
+            if (upright == null) return
+            vehicles = detector.detect(upright)
+            if (vehicles.isEmpty()) {
+                upright.recycle()
+                return
+            }
+        }
+
+        val vehicleBoxes = if (detector != null) vehicles.map { it.box } else null
+        val match = bestMatch(text, uprightWidth, uprightHeight, vehicleBoxes, settings)
+        if (match == null) {
+            upright?.recycle()
+            return
+        }
         val box = match.box
         val normalized = box?.let {
             NormalizedBox.fromPixels(it.left, it.top, it.right, it.bottom, uprightWidth, uprightHeight)
@@ -133,7 +179,10 @@ class PlateAnalyzer(
             )
         }
 
-        if (match.candidate.score < settings.minFrameScore) return
+        if (match.candidate.score < settings.minFrameScore) {
+            upright?.recycle()
+            return
+        }
 
         var plateCrop: Bitmap? = null
         var vehicleCrop: Bitmap? = null
@@ -149,22 +198,32 @@ class PlateAnalyzer(
         }
 
         if (normalized != null) {
-            val upright = uprightBitmap(proxy, rotation)
-            if (upright != null) {
-                if (settings.wantCrops) plateCrop = crop(upright, CropGeometry.plate(normalized))
+            val frame = upright ?: uprightBitmap(proxy, rotation)
+            if (frame != null) {
+                if (settings.wantCrops) plateCrop = crop(frame, CropGeometry.plate(normalized))
                 val vehicleRect = CropGeometry.vehicle(normalized)
                 if (!vehicleRect.isEmpty()) {
-                    if (settings.wantCrops) vehicleCrop = crop(upright, vehicleRect)
-                    colorName = estimateColor(upright, vehicleRect)
+                    if (settings.wantCrops) vehicleCrop = crop(frame, vehicleRect)
+                    colorName = estimateColor(frame, vehicleRect)
                 }
                 // Sampled only to cross-check a tab we actually read. Colour cannot
                 // yield a year on its own: the cycle repeats every five years.
                 if (tabReading != null) {
-                    tabColorName = estimateColor(upright, CropGeometry.tab(normalized))
+                    tabColorName = estimateColor(frame, CropGeometry.tab(normalized))
                 }
-                if (upright != plateCrop && upright != vehicleCrop) upright.recycle()
+                if (frame != plateCrop && frame != vehicleCrop) frame.recycle()
             }
+        } else {
+            upright?.recycle()
         }
+
+        // The best-scoring detected vehicle whose plate-search region actually
+        // covers where the plate was read; null (never guessed) when the gate is off.
+        val bodyType = vehicles
+            .filter { normalized == null || VehicleGate.plateSearchRegion(it.box).overlaps(normalized) }
+            .maxByOrNull { it.score }
+            ?.label
+            ?.replaceFirstChar { it.uppercase() }
 
         onResult(
             PlateFrameResult(
@@ -175,6 +234,7 @@ class PlateAnalyzer(
                 tabReading = tabReading,
                 tabColorName = tabColorName,
                 plateBox = normalized,
+                bodyType = bodyType,
             ),
         )
     }
@@ -212,12 +272,29 @@ class PlateAnalyzer(
      * Considers each text block as a whole and each of its lines separately: a plate
      * often lands as one block split into two lines, and the block text glues them
      * back together while the line box gives a tighter crop.
+     *
+     * When [vehicleBoxes] is non-null (the gate is on), a candidate is skipped
+     * outright unless its box is near one of them — see [VehicleGate]. A candidate
+     * with no box at all (rare, but ML Kit's `boundingBox` is nullable) cannot be
+     * placed relative to a vehicle, so it is rejected too rather than trusted blind.
      */
-    private fun bestMatch(text: Text, uprightHeight: Int, settings: AnalyzerConfig): Match? {
+    private fun bestMatch(
+        text: Text,
+        uprightWidth: Int,
+        uprightHeight: Int,
+        vehicleBoxes: List<NormalizedBox>?,
+        settings: AnalyzerConfig,
+    ): Match? {
         var best: Match? = null
 
         fun consider(raw: String, box: Rect?) {
             if (raw.isBlank()) return
+            if (vehicleBoxes != null) {
+                if (box == null) return
+                val normalizedBox =
+                    NormalizedBox.fromPixels(box.left, box.top, box.right, box.bottom, uprightWidth, uprightHeight)
+                if (!VehicleGate.isNearAVehicle(normalizedBox, vehicleBoxes)) return
+            }
             val line = RecognizedLine(raw, confidenceFromSize(box, uprightHeight))
             val candidate = settings.parser.best(listOf(line)) ?: return
             if (best == null || candidate.score > best!!.candidate.score) {
