@@ -1,5 +1,11 @@
 # PlateWatch
 
+> **This is the original seed of PlateWatch, frozen at its first commits.** The app now
+> lives in its own repository, [deathbyvegemite/PlateWatch](https://github.com/deathbyvegemite/PlateWatch),
+> where it has been through weeks of field testing. Its README, `CLAUDE.md` and `docs/`
+> are the current documentation, and its Releases page (`debug-bN`) has the installable
+> builds. Nothing below is maintained; treat it as history.
+
 A sideloadable Android app that reads vehicle number plates from a mounted phone
 while you drive, and logs each one with a timestamp, a GPS position and a street
 address.
