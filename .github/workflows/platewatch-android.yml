@@ -48,8 +48,20 @@ jobs:
             android/PlateWatch/gradle/libs.versions.toml
             android/PlateWatch/**/*.gradle.kts
 
+      # android-actions/setup-android@v3 now fails before any build step runs: it
+      # always tries to install the legacy "tools" package, which Google has dropped
+      # from the SDK repository. ubuntu-latest ships an SDK; put its cmdline-tools on
+      # PATH directly instead (the same fix as in deathbyvegemite/PlateWatch).
       - name: Set up the Android SDK
-        uses: android-actions/setup-android@v3
+        run: |
+          SDK_ROOT="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          CMDLINE_TOOLS_BIN=$(dirname "$(find "$SDK_ROOT/cmdline-tools" -maxdepth 3 -name sdkmanager | sort -V | tail -1)")
+          echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$SDK_ROOT" >> "$GITHUB_ENV"
+          echo "$CMDLINE_TOOLS_BIN" >> "$GITHUB_PATH"
+
+      - name: Accept Android SDK licenses
+        run: yes | sdkmanager --licenses > /dev/null 2>&1 || true
 
       - name: Install the SDK packages this build needs
         run: sdkmanager --install "platforms;android-35" "build-tools;35.0.0"
